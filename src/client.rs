@@ -23,15 +23,18 @@ use tokio::{
     sync::broadcast,  // 非同期ブロードキャストチャンネル
 };
 
-use crate::{init::{LOG_DEBUG, LOG_INFO}, milter::{
-    decode_body, decode_connect, decode_data_macros, decode_header, decode_helo, decode_optneg,
-    send_milter_response,
-}};
-use super::milter_command::MilterCommand; // Milterコマンド種別定義・判定 // 各Milterコマンドの分解・応答処理
+use super::milter_command::MilterCommand;
+use crate::{
+    init::{LOG_DEBUG, LOG_INFO},
+    milter::{
+        decode_body, decode_connect, decode_data_macros, decode_header, decode_helo, decode_optneg,
+        send_milter_response,
+    },
+}; // Milterコマンド種別定義・判定 // 各Milterコマンドの分解・応答処理
 
-use crate::parse::parse_mail;
 use crate::filter::filter_check;
 use crate::init::Config;
+use crate::parse::parse_mail;
 use std::sync::{Arc, RwLock};
 
 /// クライアント1接続ごとの非同期処理（Milterプロトコル）
@@ -80,11 +83,7 @@ pub async fn handle_client(
             } {
                 Ok(Ok(0)) => {
                     // クライアント切断（0バイト受信）
-                    crate::printdaytimeln!(
-                        LOG_INFO,
-                        "[client] 切断(phase1): {}",
-                        peer_addr
-                    );
+                    crate::printdaytimeln!(LOG_INFO, "[client] 切断(phase1): {}", peer_addr);
                     return; // ループ脱出
                 }
                 Ok(Ok(n)) => {
@@ -125,7 +124,7 @@ pub async fn handle_client(
                 if let MilterCommand::Eoh = cmd {
                     let eoh_str = MilterCommand::Eoh.as_str_eoh(is_body_eob);
                     crate::printdaytimeln!(
-                        LOG_DEBUG, 
+                        LOG_DEBUG,
                         "[client] コマンド受信(phase2): {} (0x{:02X}) size={} from {} [is_body_eob={}]",
                         eoh_str,
                         command,
@@ -186,19 +185,34 @@ pub async fn handle_client(
                 }
                 Ok(Err(e)) => {
                     // 受信エラー（I/O例外）
-                    crate::printdaytimeln!(LOG_INFO, "[client] 受信エラー(phase3): {}: {}", peer_addr, e);
+                    crate::printdaytimeln!(
+                        LOG_INFO,
+                        "[client] 受信エラー(phase3): {}: {}",
+                        peer_addr,
+                        e
+                    );
                     return; // ループ脱出
                 }
                 Err(_) => {
                     // タイムアウト切断
-                    crate::printdaytimeln!(LOG_INFO, "[client] タイムアウト(phase3): {} ({}秒間無通信)", peer_addr, config_val.client_timeout);
+                    crate::printdaytimeln!(
+                        LOG_INFO,
+                        "[client] タイムアウト(phase3): {} ({}秒間無通信)",
+                        peer_addr,
+                        config_val.client_timeout
+                    );
                     return; // ループ脱出
                 }
             }
         }
 
         // ペイロード受信完了ログ（実際の受信サイズを出力）
-        crate::printdaytimeln!(LOG_DEBUG, "[client] ペイロード受信完了: {} bytes from {}", payload.len(), peer_addr); // 受信サイズ出力
+        crate::printdaytimeln!(
+            LOG_DEBUG,
+            "[client] ペイロード受信完了: {} bytes from {}",
+            payload.len(),
+            peer_addr
+        ); // 受信サイズ出力
 
         // --- コマンド別処理: OPTNEG, EOH/BODYEOB, その他 ---
         if let Some(cmd) = milter_cmd {
@@ -234,27 +248,36 @@ pub async fn handle_client(
                     // パース処理でメール全体をパース・デバッグ出力・構造化
                     if let Some(parsed_mail) = parse_mail(&header_fields, &body_field) {
                         // フィルター用のHashMapに効率的に変換（構造体メソッド使用）
-                        let mail_values = parsed_mail.to_hash_map();
+                        let mail_values = parsed_mail.into_hash_map();
                         // フィルター判定を実行（並列処理版）
                         let filter_result = filter_check(&mail_values, &config_val);
                         let (action, logname) = {
                             let (a, l) = filter_result.as_ref().unwrap();
                             (a.as_str(), l.as_str())
                         };
-                        crate::printdaytimeln!(LOG_INFO, "[client] フィルター結果={}({})", action, logname);
+                        crate::printdaytimeln!(
+                            LOG_INFO,
+                            "[client] フィルター結果={}({})",
+                            action,
+                            logname
+                        );
                         // クライアント(Sendmail/Postfix)への応答処理
                         send_milter_response(&mut stream, &peer_addr, filter_result).await;
                     }
                 } else {
                     // actionは "CONTINUE"（0x06）で応答
-                    crate::printdaytimeln!(LOG_DEBUG, "[client] EOHコマンド受信: CONTINUE応答 (0x06) to {}", peer_addr);
+                    crate::printdaytimeln!(
+                        LOG_DEBUG,
+                        "[client] EOHコマンド受信: CONTINUE応答 (0x06) to {}",
+                        peer_addr
+                    );
                     let filter_result = Some(("CONTINUE".to_string(), "continue".to_string()));
                     // クライアント(Sendmail/Postfix)への応答処理
                     send_milter_response(&mut stream, &peer_addr, filter_result).await;
                 }
                 // BODYEOB(=is_body_eob==true)のときのみ、直前のヘッダ情報とボディ情報を出力
                 if is_body_eob {
-                    // BODYEOB時はヘッダ・ボディ情報をクリア                   
+                    // BODYEOB時はヘッダ・ボディ情報をクリア
                     header_fields.clear(); // ヘッダ初期化
                     body_field.clear(); // ボディ初期化
                     is_body_eob = false; // BODYEOB→EOH遷移
@@ -268,7 +291,8 @@ pub async fn handle_client(
                         .map(|b| format!("{:02X}", b))
                         .collect::<Vec<_>>()
                         .join(" "); // 16進ダンプ生成
-                    crate::printdaytimeln!(LOG_DEBUG, "[client] ペイロード: {}", hexstr); // 16進ダンプ出力
+                    crate::printdaytimeln!(LOG_DEBUG, "[client] ペイロード: {}", hexstr);
+                    // 16進ダンプ出力
                 }
                 // その他の正式なコマンドにはCONTINUE応答を送信しない
             }

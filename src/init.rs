@@ -31,10 +31,10 @@ pub struct FilterRule {
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub address: String,     // サーバー待受アドレス（Listen）
-    pub client_timeout: u64, // クライアントタイムアウト秒（Client_timeout）
-    pub log_file: Option<String>, // ログファイルパス（未指定ならNone）
-    pub log_level: u8,       // ログレベル（info=0, trace=2, debug=8）
+    pub address: String,                         // サーバー待受アドレス（Listen）
+    pub client_timeout: u64,                     // クライアントタイムアウト秒（Client_timeout）
+    pub log_file: Option<String>,                // ログファイルパス（未指定ならNone）
+    pub log_level: u8,                           // ログレベル（info=0, trace=2, debug=8）
     pub filters: Vec<(String, Vec<FilterRule>)>, // フィルター設定（記述順）
 }
 
@@ -56,12 +56,12 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
         client_timeout: &mut u64,
         log_file: &mut Option<String>,
         log_level: &mut u8,
-        filters: &mut Vec<(String, Vec<FilterRule>)>
+        filters: &mut Vec<(String, Vec<FilterRule>)>,
     ) {
         let mut lines = text.lines().peekable(); // 行ごとにパースするためイテレータ化
         while let Some(line) = lines.next() {
             let line = line.trim(); // 前後の空白除去
-            // 空行やコメント行はスキップ
+                                    // 空行やコメント行はスキップ
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
@@ -76,7 +76,14 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                                 if ext == "conf" {
                                     // conf拡張子なら再帰的にパース
                                     if let Ok(sub_text) = std::fs::read_to_string(&path) {
-                                        parse_config_text(&sub_text, address, client_timeout, log_file, log_level, filters);
+                                        parse_config_text(
+                                            &sub_text,
+                                            address,
+                                            client_timeout,
+                                            log_file,
+                                            log_level,
+                                            filters,
+                                        );
                                     }
                                 }
                             }
@@ -119,94 +126,105 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
             }
             // filter設定（フィルタールール）
             else if let Some(rest) = line.strip_prefix("filter[") {
-            // filter[(name)] = キー:(!)正規表現:AND/OR、REJECT/DROP/WARN/ 複数行対応
-            if let Some(end_idx) = rest.find(']') {
-                let name = &rest[..end_idx]; // フィルター名取得
-                let eq_idx = rest.find('='); // =の位置
-                // まず1行目の=以降を取得
-                let mut rule_str = if let Some(eq_idx) = eq_idx {
-                    rest[eq_idx+1..].trim().to_string()
-                } else {
-                    String::new()
-                };
-                // 次の行が空行や新たな設定項目でなければ連結（複数行対応）
-                while let Some(peek) = lines.peek() {
-                    let peek_trim = peek.trim();
-                    if peek_trim.is_empty() || peek_trim.starts_with("Listen ") || peek_trim.starts_with("Client_timeout ") || peek_trim.starts_with("filter[") {
-                        break;
+                // filter[(name)] = キー:(!)正規表現:AND/OR、REJECT/DROP/WARN/ 複数行対応
+                if let Some(end_idx) = rest.find(']') {
+                    let name = &rest[..end_idx]; // フィルター名取得
+                    let eq_idx = rest.find('='); // =の位置
+                                                 // まず1行目の=以降を取得
+                    let mut rule_str = if let Some(eq_idx) = eq_idx {
+                        rest[eq_idx + 1..].trim().to_string()
+                    } else {
+                        String::new()
+                    };
+                    // 次の行が空行や新たな設定項目でなければ連結（複数行対応）
+                    while let Some(peek) = lines.peek() {
+                        let peek_trim = peek.trim();
+                        if peek_trim.is_empty()
+                            || peek_trim.starts_with("Listen ")
+                            || peek_trim.starts_with("Client_timeout ")
+                            || peek_trim.starts_with("filter[")
+                        {
+                            break;
+                        }
+                        // コメント行はスキップして次の行へ
+                        if peek_trim.starts_with('#') {
+                            lines.next(); // コメント行を消費
+                            continue; // whileループの最初に戻る
+                        }
+                        // 連結時、カンマや空白で区切られている前提
+                        rule_str.push(' ');
+                        rule_str.push_str(peek_trim);
+                        lines.next();
                     }
-                    // コメント行はスキップして次の行へ
-                    if peek_trim.starts_with('#') {
-                        lines.next(); // コメント行を消費
-                        continue;     // whileループの最初に戻る
-                    }
-                    // 連結時、カンマや空白で区切られている前提
-                    rule_str.push(' ');
-                    rule_str.push_str(peek_trim);
-                    lines.next();
-                }
-                // 複数条件はカンマ区切りで分割
-                let rule_list: Vec<&str> = rule_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-                let mut rules = Vec::new();
-                // 各ルールをパース
-                for rule in rule_list {
-                    let parts: Vec<&str> = rule.split(':').collect();
-                    // キー:パターン:アクション（OR/AND不要）
-                    if parts.len() == 3 {
-                        let key = parts[0].trim().trim_matches('"'); // キー
-                        let (negate, pattern_raw) = if parts[1].starts_with('!') {
-                            (true, &parts[1][1..]) // 否定パターン
-                        } else {
-                            (false, parts[1])
-                        };
-                        let pattern = pattern_raw.trim().trim_matches('"'); // 正規表現
-                        if let Ok(regex) = Regex::new(pattern) {
-                            let action = parts[2].trim().trim_matches('"'); // アクション
-                            rules.push(FilterRule {
-                                key: key.to_string(),
-                                regex,
-                                negate,
-                                logic: "".to_string(),
-                                action: action.to_string(),
-                            });
+                    // 複数条件はカンマ区切りで分割
+                    let rule_list: Vec<&str> = rule_str
+                        .split(',')
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    let mut rules = Vec::new();
+                    // 各ルールをパース
+                    for rule in rule_list {
+                        let parts: Vec<&str> = rule.split(':').collect();
+                        // キー:パターン:アクション（OR/AND不要）
+                        if parts.len() == 3 {
+                            let key = parts[0].trim().trim_matches('"'); // キー
+                            let (negate, pattern_raw) = if parts[1].starts_with('!') {
+                                (true, &parts[1][1..]) // 否定パターン
+                            } else {
+                                (false, parts[1])
+                            };
+                            let pattern = pattern_raw.trim().trim_matches('"'); // 正規表現
+                            if let Ok(regex) = Regex::new(pattern) {
+                                let action = parts[2].trim().trim_matches('"'); // アクション
+                                rules.push(FilterRule {
+                                    key: key.to_string(),
+                                    regex,
+                                    negate,
+                                    logic: "".to_string(),
+                                    action: action.to_string(),
+                                });
+                            }
+                        }
+                        // キー:パターン:ロジック:アクション（AND/ORあり）
+                        else if parts.len() >= 4 {
+                            let key = parts[0].trim().trim_matches('"');
+                            let (negate, pattern_raw) = if parts[1].starts_with('!') {
+                                (true, &parts[1][1..])
+                            } else {
+                                (false, parts[1])
+                            };
+                            let pattern = pattern_raw.trim().trim_matches('"');
+                            if let Ok(regex) = Regex::new(pattern) {
+                                let logic = parts[2].trim().trim_matches('"'); // AND/OR
+                                let action = parts[3].trim().trim_matches('"'); // アクション
+                                rules.push(FilterRule {
+                                    key: key.to_string(),
+                                    regex,
+                                    negate,
+                                    logic: logic.to_string(),
+                                    action: action.to_string(),
+                                });
+                            }
                         }
                     }
-                    // キー:パターン:ロジック:アクション（AND/ORあり）
-                    else if parts.len() >= 4 {
-                        let key = parts[0].trim().trim_matches('"');
-                        let (negate, pattern_raw) = if parts[1].starts_with('!') {
-                            (true, &parts[1][1..])
-                        } else {
-                            (false, parts[1])
-                        };
-                        let pattern = pattern_raw.trim().trim_matches('"');
-                        if let Ok(regex) = Regex::new(pattern) {
-                            let logic = parts[2].trim().trim_matches('"'); // AND/OR
-                            let action = parts[3].trim().trim_matches('"'); // アクション
-                            rules.push(FilterRule {
-                                key: key.to_string(),
-                                regex,
-                                negate,
-                                logic: logic.to_string(),
-                                action: action.to_string(),
-                            });
-                        }
+                    // 最終アクションがREJECT/DROP/WARN/ACCEPTのいずれかかチェック
+                    let valid_actions = ["REJECT", "DROP", "WARN", "ACCEPT"];
+                    let is_valid = rules
+                        .last()
+                        .map(|r| {
+                            let act = r.action.to_ascii_uppercase();
+                            valid_actions.contains(&act.as_str())
+                        })
+                        .unwrap_or(false);
+                    // 有効なフィルターのみ追加
+                    if is_valid {
+                        filters.push((name.to_string(), rules));
+                    } else {
+                        crate::printdaytimeln!(LOG_INFO, "[init] filter[{}] の最終アクションがREJECT/DROP/WARN/ACCEPT以外、または未指定のため無効化", name);
                     }
-                }
-                // 最終アクションがREJECT/DROP/WARN/ACCEPTのいずれかかチェック
-                let valid_actions = ["REJECT", "DROP", "WARN", "ACCEPT"];
-                let is_valid = rules.last().map(|r| {
-                    let act = r.action.to_ascii_uppercase();
-                    valid_actions.contains(&act.as_str())
-                }).unwrap_or(false);
-                // 有効なフィルターのみ追加
-                if is_valid {
-                    filters.push((name.to_string(), rules));
-                } else {
-                    crate::printdaytimeln!(LOG_INFO, "[init] filter[{}] の最終アクションがREJECT/DROP/WARN/ACCEPT以外、または未指定のため無効化", name);
                 }
             }
-        }
         }
     }
 
@@ -217,7 +235,14 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
     let mut log_file = None; // ログファイルパス初期値
     let mut log_level: u8 = 0; // ログレベル初期値（info）
     let mut filters: Vec<(String, Vec<FilterRule>)> = Vec::new(); // フィルター初期値
-    parse_config_text(&text, &mut address, &mut client_timeout, &mut log_file, &mut log_level, &mut filters); // パース実行
+    parse_config_text(
+        &text,
+        &mut address,
+        &mut client_timeout,
+        &mut log_file,
+        &mut log_level,
+        &mut filters,
+    ); // パース実行
     let address = address.unwrap_or_else(|| "[::]:8898".to_string()); // Listen未指定時のデフォルト
     Config {
         address,

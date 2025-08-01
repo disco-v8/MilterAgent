@@ -14,8 +14,8 @@
 // =========================
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 use crate::init::Config;
@@ -37,12 +37,17 @@ use crate::init::Config;
 /// 2. 各スレッドで並列にフィルター判定を実行
 /// 3. いずれかのスレッドでNONE以外の結果が出たら他スレッドを停止
 /// 4. 結果をメインスレッドで集約してログ出力
-pub fn filter_check(_mail_values: &HashMap<String, String>, config: &Config) -> Option<(String, String)> {
+pub fn filter_check(
+    _mail_values: &HashMap<String, String>,
+    config: &Config,
+) -> Option<(String, String)> {
     // フィルター設定をベクタに変換（所有権付きで並列処理用）
-    let filters: Vec<(String, Vec<crate::init::FilterRule>)> = config.filters.iter()
+    let filters: Vec<(String, Vec<crate::init::FilterRule>)> = config
+        .filters
+        .iter()
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
-    
+
     if filters.is_empty() {
         // フィルターが設定されていない場合は"NONE"と"none"を返す
         // これにより、フィルターなしの状態でも正常に動作する
@@ -51,14 +56,16 @@ pub fn filter_check(_mail_values: &HashMap<String, String>, config: &Config) -> 
 
     // 利用可能なCPUコア数を取得（最大8スレッドに制限）
     let num_threads = std::cmp::min(
-        std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4),
-        8
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4),
+        8,
     );
     let chunk_size = filters.len().div_ceil(num_threads);
 
     // 早期終了フラグ（AtomicBool）
     let should_stop = Arc::new(AtomicBool::new(false));
-    
+
     // 結果格納用のMutex
     let result = Arc::new(Mutex::new(None::<(String, String)>)); // (action, logname)
 
@@ -80,16 +87,18 @@ pub fn filter_check(_mail_values: &HashMap<String, String>, config: &Config) -> 
                     break;
                 }
 
-                if rules.is_empty() { continue; }
+                if rules.is_empty() {
+                    continue;
+                }
 
                 // 個別フィルターの処理（既存のロジックと同じ）
                 let filter_result = process_single_filter(&mail_values, &rules, &should_stop);
-                
+
                 // NONE以外の結果が出た場合
                 if filter_result != "NONE" {
                     // 他スレッドに停止シグナル送信
                     should_stop.store(true, Ordering::Relaxed);
-                    
+
                     // 結果を格納
                     {
                         let mut result_guard = result.lock().unwrap();
@@ -124,10 +133,10 @@ pub fn filter_check(_mail_values: &HashMap<String, String>, config: &Config) -> 
 fn process_single_filter(
     mail_values: &HashMap<String, String>,
     rules: &[crate::init::FilterRule],
-    should_stop: &Arc<AtomicBool>
+    should_stop: &Arc<AtomicBool>,
 ) -> String {
     let mut idx = 0;
-    
+
     while idx < rules.len() {
         // 早期終了チェック
         if should_stop.load(Ordering::Relaxed) {
@@ -135,19 +144,19 @@ fn process_single_filter(
         }
 
         let rule = &rules[idx];
-        
+
         // メール内容から対象キーの値を取得
         let value = mail_values.get(&rule.key).map(|s| s.as_str()).unwrap_or("");
-        
+
         // 正規表現でパターンマッチング実行
         let is_match = rule.regex.is_match(value);
-        
+
         // negate指定がある場合は結果を反転
         let ok = if rule.negate { !is_match } else { is_match };
-        
+
         // アクション種別を大文字化
         let action_upper = rule.action.to_ascii_uppercase();
-        
+
         // AND条件の処理
         if action_upper == "AND" {
             if ok {
@@ -156,7 +165,7 @@ fn process_single_filter(
             } else {
                 break;
             }
-        } 
+        }
         // OR条件の処理
         else if action_upper == "OR" {
             if ok {
@@ -172,7 +181,7 @@ fn process_single_filter(
                 idx += 1;
                 continue;
             }
-        } 
+        }
         // 最終判定アクション
         else if ok {
             return rule.action.clone();
@@ -180,6 +189,6 @@ fn process_single_filter(
             break;
         }
     }
-    
+
     "NONE".to_string()
 }

@@ -15,12 +15,12 @@
 // =========================
 
 mod client; // クライアント受信処理
+mod filter;
 mod init; // 設定ファイル管理
 mod logging; // JSTタイムスタンプ付きログ出力
 mod milter; // Milterコマンドごとのデコード・応答処理
 mod milter_command; // Milterコマンド定義
-mod parse; // メールパース・出力処理
-mod filter; // フィルター判定ロジック
+mod parse; // メールパース・出力処理 // フィルター判定ロジック
 
 use init::load_config;
 use std::env;
@@ -35,16 +35,21 @@ use crate::init::LOG_INFO; // 非同期TCPサーバ・ブロードキャスト /
 /// - サーバー起動・設定管理・クライアント接続受付・シグナル処理
 #[tokio::main]
 async fn main() {
-
     // コマンドライン引数から設定ファイルパス取得（デフォルト: "MilterAgent.conf"）
     let mut args = env::args().skip(1);
     let mut config_path = {
         #[cfg(unix)]
-        { "/etc/MilterAgent.conf".to_string() }
+        {
+            "/etc/MilterAgent.conf".to_string()
+        }
         #[cfg(windows)]
-        { "MilterAgent.conf".to_string() }
+        {
+            "MilterAgent.conf".to_string()
+        }
         #[cfg(not(any(unix, windows)))]
-        { "MilterAgent.conf".to_string() }
+        {
+            "MilterAgent.conf".to_string()
+        }
     };
     while let Some(arg) = args.next() {
         if arg == "-f" {
@@ -60,7 +65,7 @@ async fn main() {
     logging::set_global_config(Arc::clone(&config));
     // サーバー再起動・終了通知用ブロードキャストチャネル
     let (shutdown_tx, _) = broadcast::channel::<()>(100);
-    
+
     #[cfg(unix)]
     {
         // SIGHUP/SIGTERM用にクローン
@@ -68,7 +73,7 @@ async fn main() {
         let config_path = Arc::clone(&config_path); // 設定ファイルパス参照用
         let shutdown_tx_hup = shutdown_tx.clone(); // SIGHUP用
         let shutdown_tx_term = shutdown_tx.clone(); // SIGTERM用
-        // SIGHUP受信: 設定ファイル再読込
+                                                    // SIGHUP受信: 設定ファイル再読込
         tokio::spawn(async move {
             let mut hup = signal(SignalKind::hangup()).expect("SIGHUP登録失敗");
             while hup.recv().await.is_some() {

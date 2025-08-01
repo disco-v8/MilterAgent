@@ -15,18 +15,18 @@
 // - printdaytimeln!: JSTタイムスタンプ付きで標準出力またはファイルにログを出すマクロ
 // =========================
 
-use std::sync::{Arc, RwLock};
 use crate::init::Config;
 use once_cell::sync::OnceCell;
+use std::sync::{Arc, RwLock};
 
 // グローバル設定を格納する静的変数（一度だけ初期化、スレッドセーフ）
 static GLOBAL_CONFIG: OnceCell<Arc<RwLock<Config>>> = OnceCell::new();
 
 /// グローバルConfigをセット（アプリケーション起動時に一度だけ呼び出し）
-/// 
+///
 /// # 引数
 /// - cfg: Arc<RwLock<Config>> - スレッド間で共有するConfig設定
-/// 
+///
 /// # 説明
 /// - OnceCell::set()で一度だけ設定可能（二回目以降は無視される）
 /// - マルチスレッド環境でも安全に設定を共有
@@ -60,7 +60,7 @@ pub fn get_global_config() -> Option<Arc<RwLock<Config>>> {
 ///   * LOG_TRACE: 詳細ログ
 ///   * LOG_DEBUG: デバッグログ
 /// - $($arg:tt)*: 可変引数（format!マクロと同様の形式でメッセージを指定）
-/// 
+///
 /// # 機能
 /// - 現在時刻をJST（日本標準時）で取得し、[YYYY/MM/DD HH:MM:SS]形式で先頭に付与
 /// - ログファイルが設定されている場合はファイルに追記
