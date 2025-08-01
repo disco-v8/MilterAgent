@@ -1,70 +1,118 @@
-# MilterDecoder
+# MilterAgent
 
-A high-performance Rust implementation of a Milter protocol server for MIME email parsing and analysis.
+A high-performance email filtering server implementing the Milter protocol, designed to protect against phishing emails from spoofed legitimate companies and organizations.
 
 ## Overview
 
-MilterDecoder is a Milter (Mail Filter) protocol server written in Rust using Tokio for asynchronous processing. It receives email data from mail servers (like Postfix) via the Milter protocol, parses MIME structure, and outputs detailed email information including headers, body content, attachments, and encoding details.
+MilterAgent is a comprehensive email security solution that implements the Milter protocol for real-time email filtering. Built with Rust and Tokio for maximum performance, it provides advanced phishing detection capabilities while maintaining low latency and high throughput.
 
 ## Features
 
-- **Asynchronous Processing**: Built with Tokio for high-performance concurrent client handling
-- **Full Milter Protocol Support**: Compatible with Postfix/Sendmail Milter protocol
-- **MIME Email Parsing**: Complete MIME structure analysis using mail-parser
-- **Detailed Output**: Extracts From/To/Subject/Content-Type/encoding/body/attachments
-- **Japanese Timezone Support**: JST timestamp logging with chrono-tz
-- **Signal Handling**: SIGHUP for config reload, SIGTERM for graceful shutdown
-- **Configurable**: External configuration file for server settings
-- **Debug Features**: NUL byte visualization, hex dump output for debugging
+- **Advanced Phishing Detection**: Comprehensive filters for detecting phishing emails impersonating:
+  - Banks and financial institutions (MUFG, Mizuho, SMBC, etc.)
+  - Delivery and logistics companies (Japan Post, Yamato, Sagawa, DHL, etc.)
+  - Transportation companies (JR, airlines, private railways, etc.)
+  - E-commerce platforms and online services
+- **Milter Protocol Support**: Full implementation of the Milter protocol for seamless integration
+- **Real-time Processing**: Asynchronous Rust implementation for handling thousands of concurrent connections
+- **High-Speed Parallel Filtering**: Multi-threaded filter evaluation with parallel execution for maximum performance
+- **Flexible Configuration**: Modular configuration system with include support
+- **Signal Handling**: Graceful shutdown and live configuration reload via SIGHUP/SIGTERM
+- **Cross-platform**: Supports both Unix and Windows environments
+- **Comprehensive Logging**: Configurable log levels with JST timestamp support
+
+## Installation
+
+### Prerequisites
+
+## Architecture
+
+- **Asynchronous Runtime**: Built with Tokio for handling multiple concurrent connections
+- **Modular Design**: Separate modules for parsing, filtering, and protocol handling
+- **Memory Safe**: Written in Rust for guaranteed memory safety and performance
+- **Parallel Filter Engine**: Configurable rule-based filtering system with regex support and multi-threaded parallel processing for high throughput
 
 ## Installation
 
 ### Prerequisites
 
 - Rust 1.70 or later
-- Tokio runtime
+- Cargo package manager
 - Compatible mail server (Postfix, Sendmail, etc.)
 
 ### Building from Source
 
 ```bash
-git clone https://github.com/disco-v8/MilterDecoder.git
-cd MilterDecoder
+git clone https://github.com/yourusername/MilterAgent.git
+cd MilterAgent
 cargo build --release
 ```
 
 ## Configuration
 
-Create a `MilterDecoder.conf` file in the project root:
+The server uses a modular configuration system:
+
+### Main Configuration File
+
+Create `MilterAgent.conf`:
 
 ```
-Listen [::]:8898
+Listen 127.0.0.1:8898
 Client_timeout 30
+Log_file /var/log/milteragent.log
+Log_level info
+
+include MilterAgent.d
+```
+
+### Filter Configuration
+
+Place filter files in the `MilterAgent.d/` directory:
+
+- `filter_bank.conf` - Banking and financial services filters
+- `filter_transport.conf` - Transportation and logistics filters
+- Additional filter files as needed
+
+### Filter Syntax
+
+```
+filter[filter_name] = 
+    "decode_from:(?i)(Pattern):AND",
+    "decode_from:!@(.*\.)?legitimate-domain\.com:REJECT"
 ```
 
 ### Configuration Options
 
-- `Listen`: Server bind address and port (supports IPv4/IPv6)
-  - Format: `IP:PORT` or just `PORT` (defaults to dual-stack)
-  - Example: `192.168.1.100:4000` or `8898`
+- `Listen`: Server bind address and port
+  - Format: `IP:PORT` or just `PORT`
+  - Example: `127.0.0.1:8898` or `8898`
 - `Client_timeout`: Client inactivity timeout in seconds
+- `Log_file`: Path to log file (optional, defaults to stdout)
+- `Log_level`: Logging verbosity (`info`, `trace`, `debug`)
+- `include`: Include additional configuration directories
 
 ## Usage
 
 ### Starting the Server
 
 ```bash
-./target/release/milter_decoder
+# With default configuration
+./target/release/milter_agent
+
+# With custom configuration file
+./target/release/milter_agent -f /path/to/config.conf
 ```
 
-### Postfix Integration
+### Mail Server Integration
+
+#### Postfix Integration
 
 Add to `/etc/postfix/main.cf`:
 
 ```
-smtpd_milters = inet:localhost:8898
-non_smtpd_milters = inet:localhost:8898
+smtpd_milters = inet:127.0.0.1:8898
 milter_default_action = accept
+milter_protocol = 6
 ```
 
 Restart Postfix:
@@ -73,42 +121,85 @@ Restart Postfix:
 sudo systemctl restart postfix
 ```
 
+#### Sendmail Integration
+
+Add to `/etc/mail/sendmail.mc`:
+
+```
+INPUT_MAIL_FILTER(`milteragent', `S=inet:8898@127.0.0.1')
+```
+
 ### Signal Handling
 
-- **SIGHUP**: Reload configuration file
+- **SIGHUP**: Reload configuration files
 - **SIGTERM**: Graceful shutdown
+- **Ctrl+C** (Windows): Graceful shutdown
 
 ```bash
 # Reload configuration
-kill -HUP $(pidof milter_decoder)
+kill -HUP $(pidof milter_agent)
 
 # Graceful shutdown
-kill -TERM $(pidof milter_decoder)
+kill -TERM $(pidof milter_agent)
 ```
 
-## Output Format
+## Logging
 
-The server outputs detailed email analysis to stdout with JST timestamps:
+The server supports configurable log levels:
+
+- `info` (0): Basic operational messages
+- `trace` (2): Detailed tracing information  
+- `debug` (8): Comprehensive debugging output
+
+Logs include JST timestamps and are output to either a file or stdout based on configuration.
+
+## Filter Examples
+
+### Banking Filter
 
 ```
-[2024/07/22 15:30:45] --- BODYEOB時のメール全体 ---
-[2024/07/22 15:30:45] [mail-parser] from: sender@example.com
-[2024/07/22 15:30:45] [mail-parser] to: recipient@example.com
-[2024/07/22 15:30:45] [mail-parser] subject: Test Email
-[2024/07/22 15:30:45] [mail-parser] content-type: "text/plain; charset=utf-8"
-[2024/07/22 15:30:45] [mail-parser] テキストパート数: 1
-[2024/07/22 15:30:45] [mail-parser] 非テキストパート数: 0
-[2024/07/22 15:30:45] 本文(1): Hello, this is a test email.
+filter[phish_mufg] = 
+    "decode_from:(?i)(三菱UFJ|MUFG):AND",
+    "decode_from:!@(.*\.)?mufg\.jp:REJECT"
+```
+
+### Transportation Filter
+
+```
+filter[phish_jreast] = 
+    "decode_from:(?i)(JR東日本|East Japan Railway):AND",
+    "decode_from:!(@(.*\.)?jreast\.co\.jp|@(.*\.)?jre-vts\.com):REJECT"
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Security Notice
+
+This software is designed to help protect against phishing emails but should be used as part of a comprehensive email security strategy. Regular updates to filter rules are recommended to address new phishing campaigns.
+
+## Support
+
+For issues, questions, or contributions, please use the GitHub issue tracker.
 ```
 
 ### Multi-part Email with Attachments
 
 ```
-[2024/07/22 15:31:20] このメールはマルチパートです
-[2024/07/22 15:31:20] [mail-parser] テキストパート数: 1
-[2024/07/22 15:31:20] [mail-parser] 非テキストパート数: 1
-[2024/07/22 15:31:20] 本文(1): Email body content
-[2024/07/22 15:31:20] 非テキストパート(1): content_type="application/pdf", encoding=Base64, filename=document.pdf, size=1024 bytes
+[2025/07/23 15:31:20] このメールはマルチパートです
+[2025/07/23 15:31:20] [mail-parser] テキストパート数: 1
+[2025/07/23 15:31:20] [mail-parser] 非テキストパート数: 1
+[2025/07/23 15:31:20] 本文(1): Email body content
+[2025/07/23 15:31:20] 非テキストパート(1): content_type="application/pdf", encoding=Base64, filename=document.pdf, size=1024 bytes
 ```
 
 ## Architecture

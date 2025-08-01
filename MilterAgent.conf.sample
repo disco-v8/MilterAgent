@@ -1,6 +1,6 @@
-# MilterDecoder Configuration File
+# MilterAgent Configuration File
 # 
-# This file configures the MilterDecoder server settings.
+# This file configures the MilterAgent server settings.
 # Reload configuration by sending SIGHUP signal to the process.
 
 # Server listen address and port

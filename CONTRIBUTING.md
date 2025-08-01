@@ -1,19 +1,6 @@
-# Contributing to MilterDecoder
+# Contributing to MilterAgent
 
-Thank you for your interest in contributing to MilterDecoder! This document provides guidelines for contributing to the project.
-
-## Getting Started
-
-1. **Fork the repository** on GitHub
-2. **Clone your fork** locally:
-   ```bash
-   git clone https://github.com/disco-v8/MilterDecoder.git
-   cd MilterDecoder
-   ```
-3. **Create a branch** for your feature or bug fix:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+Thank you for your interest in contributing to MilterAgent! This document provides guidelines for contributing to the project.
 
 ## Development Setup
 
@@ -46,7 +33,7 @@ cargo clippy
 
 ```bash
 # Copy sample configuration
-cp MilterDecoder.conf.sample MilterDecoder.conf
+cp MilterAgent.conf.sample MilterAgent.conf
 
 # Run in development mode
 cargo run
@@ -67,7 +54,7 @@ Each module should have a header comment block like:
 ```rust
 // =========================
 // module_name.rs
-// MilterDecoder Module Description
+// MilterAgent Module Description
 //
 // 【このファイルで使う主なクレート】
 // - crate_name: Description of usage
@@ -118,7 +105,7 @@ Each module should have a header comment block like:
 
 3. **Test configuration reload**:
    ```bash
-   kill -HUP $(pidof milter_decoder)
+   kill -HUP $(pidof milter_agent)
    ```
 
 ### Automated Testing
@@ -178,7 +165,7 @@ When reporting bugs or requesting features:
 
 ## License
 
-By contributing to MilterDecoder, you agree that your contributions will be licensed under the MIT License.
+By contributing to MilterAgent, you agree that your contributions will be licensed under the MIT License.
 
 ## Questions?
 

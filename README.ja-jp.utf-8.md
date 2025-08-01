@@ -1,70 +1,114 @@
-# MilterDecoder
+# MilterAgent
 
-MIMEメール解析用の高性能Rust実装Milterプロトコルサーバー
+正規企業・組織を騙るフィッシングメールから保護するために設計された、Milterプロトコルを実装した高性能メールフィルタリングサーバーです。
 
 ## 概要
 
-MilterDecoderは、Tokioを使用した非同期処理によってRustで書かれたMilter（メールフィルター）プロトコルサーバーです。メールサーバー（Postfixなど）からMilterプロトコル経由でメールデータを受信し、MIME構造を解析して、ヘッダー、本文内容、添付ファイル、エンコーディング詳細を含む詳細なメール情報を出力します。
+MilterAgentは、リアルタイムメールフィルタリングのためのMilterプロトコルを実装した包括的なメールセキュリティソリューションです。RustとTokioで構築され、低レイテンシと高スループットを維持しながら、高度なフィッシング検出機能を提供します。
 
-## 機能
+## 特徴
 
-- **非同期処理**: Tokioによる高性能な並行クライアント処理
-- **完全なMilterプロトコルサポート**: Postfix/Sendmail Milterプロトコルとの互換性
-- **MIMEメール解析**: mail-parserを使用した完全なMIME構造解析
-- **詳細出力**: From/To/Subject/Content-Type/エンコーディング/本文/添付ファイルの抽出
-- **日本時間サポート**: chrono-tzによるJSTタイムスタンプログ
-- **シグナル処理**: 設定再読込用SIGHUP、安全停止用SIGTERM
-- **設定可能**: 外部設定ファイルによるサーバー設定
-- **デバッグ機能**: NULバイト可視化、デバッグ用16進ダンプ出力
+- **高度なフィッシング検出**: 以下を騙るフィッシングメールを検出する包括的なフィルター:
+  - 銀行・金融機関（三菱UFJ、みずほ、三井住友など）
+  - 配送・物流会社（日本郵便、ヤマト運輸、佐川急便、DHLなど）
+  - 交通機関（JR各社、航空会社、私鉄など）
+  - ECプラットフォーム・オンラインサービス
+- **Milterプロトコルサポート**: シームレスな統合のための完全なMilterプロトコル実装
+- **リアルタイム処理**: 数千の同時接続を処理する非同期Rust実装
+- **高速並列フィルタリング**: マルチスレッド処理によるフィルター評価の並列実行で高速処理を実現
+- **柔軟な設定**: includeサポートを備えたモジュラー設定システム
+- **シグナル処理**: SIGHUP/SIGTERMによる安全な終了とライブ設定リロード
+- **クロスプラットフォーム**: UnixとWindowsの両環境をサポート
+- **包括的なログ**: JSTタイムスタンプサポート付きの設定可能なログレベル
+
+## アーキテクチャ
+
+- **非同期ランタイム**: 複数の同時接続を処理するためのTokio構築
+- **モジュラー設計**: パース、フィルタリング、プロトコル処理の独立モジュール
+- **メモリセーフ**: 保証されたメモリ安全性とパフォーマンスのためのRust記述
+- **並列フィルターエンジン**: 正規表現サポート付きの設定可能なルールベースフィルタリングシステム、マルチスレッドによる並列処理で高いスループットを実現
 
 ## インストール
 
 ### 前提条件
 
 - Rust 1.70以降
-- Tokioランタイム
+- Cargoパッケージマネージャー
 - 対応メールサーバー（Postfix、Sendmailなど）
 
 ### ソースからのビルド
 
 ```bash
-git clone https://github.com/disco-v8/MilterDecoder.git
-cd MilterDecoder
+git clone https://github.com/yourusername/MilterAgent.git
+cd MilterAgent
 cargo build --release
 ```
 
 ## 設定
 
-プロジェクトルートに`MilterDecoder.conf`ファイルを作成してください：
+サーバーはモジュラー設定システムを使用します：
+
+### メイン設定ファイル
+
+`MilterAgent.conf`を作成：
 
 ```
-Listen [::]:8898
+Listen 127.0.0.1:8898
 Client_timeout 30
+Log_file /var/log/milteragent.log
+Log_level info
+
+include MilterAgent.d
+```
+
+### フィルター設定
+
+`MilterAgent.d/`ディレクトリにフィルターファイルを配置：
+
+- `filter_bank.conf` - 銀行・金融サービスフィルター
+- `filter_transport.conf` - 交通・物流フィルター
+- 必要に応じて追加のフィルターファイル
+
+### フィルター構文
+
+```
+filter[フィルター名] = 
+    "decode_from:(?i)(パターン):AND",
+    "decode_from:!@(.*\.)?正規ドメイン\.com:REJECT"
 ```
 
 ### 設定オプション
 
-- `Listen`: サーバーバインドアドレスとポート（IPv4/IPv6サポート）
-  - 形式: `IP:PORT` または `PORT`のみ（デュアルスタックがデフォルト）
-  - 例: `192.168.1.100:4000` または `8898`
-- `Client_timeout`: クライアント無通信タイムアウト秒数
+- `Listen`: サーバーバインドアドレスとポート
+  - 形式: `IP:PORT`または`PORT`のみ
+  - 例: `127.0.0.1:8898`または`8898`
+- `Client_timeout`: クライアント非アクティブタイムアウト（秒）
+- `Log_file`: ログファイルパス（オプション、デフォルトは標準出力）
+- `Log_level`: ログ詳細度（`info`、`trace`、`debug`）
+- `include`: 追加設定ディレクトリをインクルード
 
 ## 使用方法
 
-### サーバーの起動
+### サーバー起動
 
 ```bash
-./target/release/milter_decoder
+# デフォルト設定で起動
+./target/release/milter_agent
+
+# カスタム設定ファイルで起動
+./target/release/milter_agent -f /path/to/config.conf
 ```
 
-### Postfixとの連携
+### メールサーバー統合
+
+#### Postfix統合
 
 `/etc/postfix/main.cf`に追加：
 
 ```
-smtpd_milters = inet:localhost:8898
-non_smtpd_milters = inet:localhost:8898
+smtpd_milters = inet:127.0.0.1:8898
 milter_default_action = accept
+milter_protocol = 6
 ```
 
 Postfixを再起動：
@@ -73,173 +117,72 @@ Postfixを再起動：
 sudo systemctl restart postfix
 ```
 
+#### Sendmail統合
+
+`/etc/mail/sendmail.mc`に追加：
+
+```
+INPUT_MAIL_FILTER(`milteragent', `S=inet:8898@127.0.0.1')
+```
+
 ### シグナル処理
 
-- **SIGHUP**: 設定ファイル再読込
-- **SIGTERM**: 安全停止
+- **SIGHUP**: 設定ファイルのリロード
+- **SIGTERM**: 安全な終了
+- **Ctrl+C**（Windows）: 安全な終了
 
 ```bash
-# 設定再読込
-kill -HUP $(pidof milter_decoder)
+# 設定リロード
+kill -HUP $(pidof milter_agent)
 
-# 安全停止
-kill -TERM $(pidof milter_decoder)
+# 安全な終了
+kill -TERM $(pidof milter_agent)
 ```
 
-## 出力形式
+## ログ
 
-サーバーはJSTタイムスタンプ付きで詳細なメール解析を標準出力に出力します：
+サーバーは設定可能なログレベルをサポート：
 
-```
-[2024/07/22 15:30:45] --- BODYEOB時のメール全体 ---
-[2024/07/22 15:30:45] [mail-parser] from: sender@example.com
-[2024/07/22 15:30:45] [mail-parser] to: recipient@example.com
-[2024/07/22 15:30:45] [mail-parser] subject: Test Email
-[2024/07/22 15:30:45] [mail-parser] content-type: "text/plain; charset=utf-8"
-[2024/07/22 15:30:45] [mail-parser] テキストパート数: 1
-[2024/07/22 15:30:45] [mail-parser] 非テキストパート数: 0
-[2024/07/22 15:30:45] 本文(1): Hello, this is a test email.
-```
+- `info`（0）: 基本的な動作メッセージ
+- `trace`（2）: 詳細なトレース情報
+- `debug`（8）: 包括的なデバッグ出力
 
-### 添付ファイル付きマルチパートメール
+ログはJSTタイムスタンプを含み、設定に基づいてファイルまたは標準出力に出力されます。
+
+## フィルター例
+
+### 銀行フィルター
 
 ```
-[2024/07/22 15:31:20] このメールはマルチパートです
-[2024/07/22 15:31:20] [mail-parser] テキストパート数: 1
-[2024/07/22 15:31:20] [mail-parser] 非テキストパート数: 1
-[2024/07/22 15:31:20] 本文(1): Email body content
-[2024/07/22 15:31:20] 非テキストパート(1): content_type="application/pdf", encoding=Base64, filename=document.pdf, size=1024 bytes
+filter[phish_mufg] = 
+    "decode_from:(?i)(三菱UFJ|MUFG):AND",
+    "decode_from:!@(.*\.)?mufg\.jp:REJECT"
 ```
 
-## アーキテクチャ
+### 交通機関フィルター
 
-### モジュール構造
-
-- **main.rs**: サーバー起動、設定管理、シグナル処理
-- **client.rs**: クライアント毎のMilterプロトコル処理
-- **milter.rs**: Milterコマンドデコードと応答生成
-- **milter_command.rs**: Milterプロトコルコマンド定義
-- **parse.rs**: MIMEメール解析と出力整形
-- **init.rs**: 設定ファイル管理
-- **logging.rs**: JSTタイムスタンプログマクロ
-
-### Milterプロトコルフロー
-
-1. **OPTNEG**: プロトコルネゴシエーション
-2. **CONNECT**: クライアント接続情報
-3. **HELO/EHLO**: SMTP挨拶
-4. **DATA**: マクロ情報
-5. **HEADER**: メールヘッダー（複数）
-6. **BODY**: メール本文内容（複数チャンク）
-7. **BODYEOB**: 本文終了 - メール解析と出力をトリガー
-
-## 依存関係
-
-- [tokio](https://tokio.rs/): 非同期ランタイム
-- [mail-parser](https://crates.io/crates/mail-parser): MIMEメール解析
-- [chrono](https://crates.io/crates/chrono): 日時処理
-- [chrono-tz](https://crates.io/crates/chrono-tz): タイムゾーンサポート
-- [lazy_static](https://crates.io/crates/lazy_static): グローバル静的変数
-
-## 開発
-
-### 開発モードでの実行
-
-```bash
-cargo run
 ```
-
-### サンプルメールでのテスト
-
-設定されたPostfixインスタンス経由でメールを送信するか、telnetを使用してrawSMTPコマンドを送信することでサーバーをテストできます。
-
-### デバッグ機能
-
-- NULバイト可視化: `\0`バイトは`<NUL>`として表示
-- 未知コマンドの16進ダンプ出力
-- 詳細なプロトコルコマンドログ
-- 説明的なメッセージによるエラー処理
+filter[phish_jreast] = 
+    "decode_from:(?i)(JR東日本|East Japan Railway):AND",
+    "decode_from:!(@(.*\.)?jreast\.co\.jp|@(.*\.)?jre-vts\.com):REJECT"
+```
 
 ## 貢献
 
 1. リポジトリをフォーク
-2. フィーチャーブランチを作成
-3. 変更を加える
-4. 該当する場合はテストを追加
-5. プルリクエストを送信
+2. フィーチャーブランチを作成（`git checkout -b feature/amazing-feature`）
+3. 変更をコミット（`git commit -m 'Add amazing feature'`）
+4. ブランチにプッシュ（`git push origin feature/amazing-feature`）
+5. プルリクエストを開く
 
 ## ライセンス
 
-このプロジェクトはMITライセンスの下でライセンスされています - 詳細は[LICENSE](LICENSE)ファイルを参照してください。
+このプロジェクトはMITライセンスの下でライセンスされています - 詳細は[LICENSE](LICENSE)ファイルをご覧ください。
 
-**注意:**
-- 本ソフトウェアはサードパーティ製クレートを利用しており、一部はApache-2.0ライセンスです。
-- 特に [mail-parser](https://crates.io/crates/mail-parser) クレートはApache-2.0ライセンスです。再配布や改変の際は各クレートのライセンス条項もご確認ください。
+## セキュリティに関する注意
+
+このソフトウェアはフィッシングメールからの保護を支援するように設計されていますが、包括的なメールセキュリティ戦略の一部として使用されるべきです。新しいフィッシングキャンペーンに対応するため、フィルタールールの定期的な更新が推奨されます。
 
 ## サポート
 
-問題、質問、または貢献については、GitHubでissueを開いてください。
-
-## 変更履歴
-
-### v0.1.0
-- 初回リリース
-- 基本的なMilterプロトコル実装
-- MIMEメール解析と出力
-- 設定ファイルサポート
-- シグナル処理
-- JSTタイムスタンプログ
-
-## 技術仕様
-
-### サポートされるRustバージョン
-- Rust 2021 edition
-- 安定版、ベータ版、ナイトリー版でテスト済み
-
-### パフォーマンス特性
-- 非同期I/Oによる高いスループット
-- 低メモリフットプリント
-- 並行クライアント処理
-
-### セキュリティ機能
-- 入力バリデーション
-- タイムアウト処理
-- 安全なエラー処理
-- メモリ安全性（Rustの利点）
-
-## トラブルシューティング
-
-### 一般的な問題
-
-**ポートバインドエラー**
-```
-ポートバインド失敗: Address already in use
-```
-- 他のプロセスが同じポートを使用していないか確認
-- `netstat -tulpn | grep 8898`でポート使用状況を確認
-
-**Postfix接続エラー**
-- Postfixの設定を確認
-- ファイアウォール設定を確認
-- MilterDecoderが正しいアドレスでリッスンしているか確認
-
-**設定ファイルエラー**
-- `MilterDecoder.conf`がプロジェクトルートに存在するか確認
-- 設定ファイルの構文が正しいか確認
-
-### ログレベル
-
-現在の実装では全てのログが出力されます。将来のバージョンでログレベル制御を追加予定です。
-
-## 将来の計画
-
-- 設定可能なログレベル
-- 統計情報とメトリクス
-- Webダッシュボード
-- プラグインシステム
-- データベース統合
-- 追加のメールサーバーサポート
-
-## 貢献者
-
-このプロジェクトへの貢献に興味がある場合は、[CONTRIBUTING.md](CONTRIBUTING.md)を参照してください。
+問題、質問、または貢献については、GitHubイシュートラッカーをご利用ください。

@@ -1,24 +1,64 @@
 // =========================
 // parse.rs
-// MilterDecoder メールパース・出力処理モジュール
+// MilterAgent メールパース処理モジュール
 //
 // 【このファイルで使う主なクレート】
-// - mail_parser: MIMEメールのパース・構造化・本文抽出・添付抽出（MessageParser, MimeHeaders）
-// - std: 標準ライブラリ（コレクション・文字列操作・イテレータ等）
+// - mail_parser: MIMEメール構造解析・ヘッダ抽出・エンコーディング処理（Message, MessageParser, MimeHeaders等）
+// - std: 標準ライブラリ（コレクション、I/O、文字列操作など）
 // - crate::printdaytimeln!: JSTタイムスタンプ付きログ出力マクロ
 //
 // 【役割】
-// - BODYEOB時にヘッダ＋ボディを合体してメール全体をパース
-// - From/To/Subject/Content-Type/エンコーディング/本文の構造化出力
-// - パートごとのテキスト/非テキスト判定・出力
-// - 添付ファイル名抽出・属性出力
-// - NULバイト混入の可視化・除去
+// - BODYEOB時のヘッダ＋ボディ合体処理
+// - mail-parserによるMIME構造パース（マルチパート対応）
+// - From/To/Subject/Content-Type/エンコーディング等のメタ情報抽出・出力
+// - テキストパート（text/plain, text/html）の本文抽出・出力
+// - 非テキストパート（添付ファイル等）の属性情報抽出・出力
+// - NULバイト混入の可視化・除去処理
+// - フィルター処理用の正規化されたデータ構造への変換
 // =========================
 
-// mail_parserクレートからメールパーサー本体とMimeHeadersトレイトをインポート
 use mail_parser::{MessageParser, MimeHeaders}; // メールパース・MIMEヘッダアクセス用
-                                               // ヘッダ情報格納用のHashMapをインポート
-use std::collections::HashMap; // ヘッダ格納用
+use std::collections::HashMap;
+
+use crate::init::{LOG_DEBUG, LOG_INFO, LOG_TRACE};
+
+/// パース済みメール情報の構造体
+#[derive(Debug, Clone)]
+pub struct ParsedMail {
+    pub decode_from: String,
+    pub decode_to: String,
+    pub decode_subject: String,
+    pub decode_text: String,
+    pub decode_html: String,
+    pub header_fields: HashMap<String, String>,
+}
+
+impl ParsedMail {
+    /// フィルター処理用のHashMapに変換（効率的な一括変換）
+    /// 
+    /// # 戻り値
+    /// - HashMap<String, String>: フィルター処理で使用するキー・バリューペア
+    /// 
+    /// # 説明
+    /// - デコード済み情報（decode_from, decode_to等）を格納
+    /// - 生ヘッダー情報（header_fields）をマージ
+    /// - 重複するキーがあれば生ヘッダー情報が優先される
+    pub fn to_hash_map(self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        
+        // デコード済み情報を格納
+        map.insert("decode_from".to_string(), self.decode_from);
+        map.insert("decode_to".to_string(), self.decode_to);
+        map.insert("decode_subject".to_string(), self.decode_subject);
+        map.insert("decode_text".to_string(), self.decode_text);
+        map.insert("decode_html".to_string(), self.decode_html);
+        
+        // 生ヘッダー情報をマージ（既存のキーがあれば上書き）
+        map.extend(self.header_fields);
+        
+        map
+    }
+}
 
 /// BODYEOB時にヘッダ＋ボディを合体してメール全体をパース・出力する関数
 ///
@@ -26,14 +66,19 @@ use std::collections::HashMap; // ヘッダ格納用
 /// - `header_fields`: Milterで受信したヘッダ情報（HashMap<String, Vec<String>>）
 /// - `body_field`: Milterで受信したボディ情報（文字列）
 ///
+/// # 戻り値
+/// - Some(ParsedMail): パース成功時の構造化データ
+/// - None: パース失敗時
+///
 /// # 説明
 /// 1. ヘッダ＋ボディを合体してメール全体の生データを構築
 /// 2. mail-parserでMIME構造をパース
-/// 3. From/To/Subject/Content-Type/エンコーディング等の情報を出力
-/// 4. パートごとのテキスト/非テキスト判定・出力
-/// 5. 添付ファイル名抽出・属性出力
+/// 3. From/To/Subject/Content-Type/エンコーディング等の情報を出力（デバッグ用）
+/// 4. パートごとのテキスト/非テキスト判定・出力（デバッグ用）
+/// 5. 添付ファイル名抽出・属性出力（デバッグ用）
 /// 6. NULバイト混入の可視化・除去
-pub fn parse_mail(header_fields: &HashMap<String, Vec<String>>, body_field: &str) {
+/// 7. 構造化されたパース結果を返却
+pub fn parse_mail(header_fields: &HashMap<String, Vec<String>>, body_field: &str) -> Option<ParsedMail> {
     // ヘッダ情報とボディ情報を合体し、RFC準拠のメール全体文字列を作成
     let mut mail_string = String::new(); // メール全体の文字列構築用バッファ
     
@@ -53,22 +98,24 @@ pub fn parse_mail(header_fields: &HashMap<String, Vec<String>>, body_field: &str
     
     // NULバイト（\0）を可視化文字に置換してデバッグ出力用に整形
     let mail_string_visible = mail_string.replace("\0", "<NUL>");
-    crate::printdaytimeln!("--- BODYEOB時のメール全体 ---");
-    crate::printdaytimeln!("{}", mail_string_visible); // 生メールデータの可視化出力
+    crate::printdaytimeln!(LOG_DEBUG, "[parser] --- BODYEOB時のメール全体 ---");
+    crate::printdaytimeln!(LOG_DEBUG, "{}", mail_string_visible); // 生メールデータの可視化出力
+    crate::printdaytimeln!(LOG_DEBUG, "[parser] --- BODYEOB時のメール全体、ここまで ---");
 
-    // mail-parserでメール全体をパース
-    let parser = MessageParser::default(); // パーサーインスタンス生成
+    // mail-parserでメール全体をパース（バイト配列として処理）
+    let parser = MessageParser::default(); // パーサーインスタンス生成（デフォルト設定）
     if let Some(msg) = parser.parse(mail_string.as_bytes()) {
-        // パース成功時
-        // Fromアドレスを文字列化（複数対応）
+        // === パース成功時の処理開始 ===
+        
+        // === 差出人（From）情報の抽出・整形 ===
         let from = msg
             .from()
             .map(|addrs| {
                 addrs
                     .iter()
                     .map(|addr| {
-                        let name = addr.name().unwrap_or(""); // 差出人名
-                        let address = addr.address().unwrap_or(""); // アドレス
+                        let name = addr.name().unwrap_or(""); // 差出人名（表示名）
+                        let address = addr.address().unwrap_or(""); // メールアドレス
                         if !name.is_empty() {
                             format!("{} <{}>", name, address) // 名前付きフォーマット
                         } else {
@@ -76,18 +123,19 @@ pub fn parse_mail(header_fields: &HashMap<String, Vec<String>>, body_field: &str
                         }
                     })
                     .collect::<Vec<_>>()
-                    .join(", ") // 複数アドレスをカンマ区切り
+                    .join(", ") // 複数アドレスをカンマ区切りで連結
             })
-            .unwrap_or_else(|| "(なし)".to_string()); // From無し時のデフォルト
-                                                      // Toアドレスを文字列化（複数対応）
+            .unwrap_or_else(|| "(なし)".to_string()); // From無し時のデフォルト値
+            
+        // === 宛先（To）情報の抽出・整形 ===
         let to = msg
             .to()
             .map(|addrs| {
                 addrs
                     .iter()
                     .map(|addr| {
-                        let name = addr.name().unwrap_or(""); // 宛先名
-                        let address = addr.address().unwrap_or(""); // 宛先アドレス
+                        let name = addr.name().unwrap_or(""); // 宛先名（表示名）
+                        let address = addr.address().unwrap_or(""); // 宛先メールアドレス
                         if !name.is_empty() {
                             format!("{} <{}>", name, address) // 名前付きフォーマット
                         } else {
@@ -95,157 +143,177 @@ pub fn parse_mail(header_fields: &HashMap<String, Vec<String>>, body_field: &str
                         }
                     })
                     .collect::<Vec<_>>()
-                    .join(", ") // 複数アドレスをカンマ区切り
+                    .join(", ") // 複数アドレスをカンマ区切りで連結
             })
-            .unwrap_or_else(|| "(なし)".to_string()); // To無し時のデフォルト
-                                                      // 件名取得
-        let subject = msg.subject().unwrap_or("(なし)"); // 件名無し時のデフォルト
-        crate::printdaytimeln!("[mail-parser] from: {}", from); // From出力
-        crate::printdaytimeln!("[mail-parser] to: {}", to); // To出力
-        crate::printdaytimeln!("[mail-parser] subject: {}", subject); // 件名出力
-                                                                      // Content-Type（MIMEタイプ）があれば出力
+            .unwrap_or_else(|| "(なし)".to_string()); // To無し時のデフォルト値
+            
+        // === 件名（Subject）情報の抽出 ===
+        let subject = msg.subject().unwrap_or("(なし)"); // 件名無し時のデフォルト値
+        
+        // 基本情報の出力
+        crate::printdaytimeln!(LOG_INFO, "[parser] from: {}", from); // From出力
+        crate::printdaytimeln!(LOG_INFO, "[parser] to: {}", to); // To出力
+        crate::printdaytimeln!(LOG_INFO, "[parser] subject: {}", subject); // 件名出力
+
+        // === Content-Type（MIMEタイプ）情報の抽出・出力 ===
         if let Some(ct) = msg
             .headers()
             .iter()
-            .find(|h| h.name().eq_ignore_ascii_case("Content-Type")) // ヘッダ名がContent-Typeか判定
+            .find(|h| h.name().eq_ignore_ascii_case("Content-Type")) // 大文字小文字無視でヘッダ検索
             .map(|h| h.value())
-        // ヘッダ値を取得
         {
-            crate::printdaytimeln!("[mail-parser] content-type: {:?}", ct); // MIMEタイプ出力
+            crate::printdaytimeln!(LOG_TRACE, "[parser] content-type: {:?}", ct); // MIMEタイプ出力
         }
-        // Content-Transfer-Encoding（エンコーディング方式）があれば出力
+        
+        // === Content-Transfer-Encoding（エンコーディング方式）情報の抽出・出力 ===
         if let Some(enc) = msg
             .headers()
             .iter()
-            .find(|h| h.name().eq_ignore_ascii_case("Content-Transfer-Encoding")) // ヘッダ名がContent-Transfer-Encodingか判定
+            .find(|h| h.name().eq_ignore_ascii_case("Content-Transfer-Encoding")) // 大文字小文字無視でヘッダ検索
             .map(|h| h.value())
-        // ヘッダ値を取得
         {
-            crate::printdaytimeln!("[mail-parser] encoding: {:?}", enc); // エンコーディング出力
+            crate::printdaytimeln!(LOG_TRACE, "[parser] encoding: {:?}", enc); // エンコーディング出力
         }
-        // マルチパートかどうか判定（パート数で判定）
+        
+        // === メール構造（マルチパート/シングルパート）の判定・出力 ===
         if msg.parts.len() > 1 {
-            crate::printdaytimeln!("[mail-parser] このメールはマルチパートです"); // 複数パート
+            crate::printdaytimeln!(LOG_TRACE, "[parser] このメールはマルチパートです"); // 複数パート
         } else {
-            crate::printdaytimeln!("[mail-parser] このメールはシングルパートです"); // 単一パート
+            crate::printdaytimeln!(LOG_TRACE, "[parser] このメールはシングルパートです"); // 単一パート
         }
-        // テキストパート数・非テキストパート数をカウント
-        let mut text_count = 0; // 実際に本文出力対象となるテキストパート数
-        let mut non_text_count = 0; // 添付ファイル等の非テキストパート数
         
-        // テキストパートのインデックスリストを作成（本文出力で使用）
-        let mut text_indices = Vec::new(); // 本文出力対象パートのインデックス記録用
+        // === パート分類処理（テキスト/非テキスト判定） ===
+        let mut text_count = 0; // テキストパート数のカウンタ
+        let mut non_text_count = 0; // 非テキストパート数のカウンタ
+        let mut text_indices = Vec::new(); // テキストパートのインデックス格納配列
         
-        // 各パートを順番に調べてテキスト/非テキストを分類
+        // 各パートを走査し、テキスト/非テキストを分類
         for (i, part) in msg.parts.iter().enumerate() {
-            // パートがテキスト系かどうか判定（text/plain, text/html, multipart/alternative等）
             if part.is_text() {
-                // multipart/*系パートは親パートなので本文出力対象から除外
-                // （実際の本文はその子パートに格納されている）
+                // multipart/*は親パートなので除外（実際のテキストではない）
                 let is_multipart = part.content_type()
                     .is_some_and(|ct| ct.c_type.eq_ignore_ascii_case("multipart"));
-                
                 if !is_multipart {
-                    // text/plain, text/html等の実体のあるテキストパート
-                    text_count += 1; // テキストパート数をカウント
-                    text_indices.push(i); // 本文出力用にインデックスを記録
-                } else {
-                    // multipart/alternative等の親パートは本文出力対象外
-                    // （コメントのみで処理は何もしない）
+                    text_count += 1; // テキストパート数カウント
+                    text_indices.push(i); // テキストパートのインデックス記録
                 }
             } else {
-                // application/octet-stream等の非テキストパート（添付ファイル等）
-                non_text_count += 1; // 非テキストパート数をカウント
+                non_text_count += 1; // 非テキストパート数カウント
             }
         }
-        crate::printdaytimeln!("[mail-parser] テキストパート数: {}", text_count); // テキストパート数出力
-        crate::printdaytimeln!("[mail-parser] 非テキストパート数: {}", non_text_count); // 非テキストパート数出力
+        
+        // パート分類結果の出力
+        crate::printdaytimeln!(LOG_TRACE, "[parser] テキストパート数: {}", text_count); // テキストパート数出力
+        crate::printdaytimeln!(LOG_TRACE, "[parser] 非テキストパート数: {}", non_text_count); // 非テキストパート数出力
 
-        // 本文出力処理：テキストパートごとに内容を出力
+        // === テキストパート本文の抽出・出力処理 ===
+        let mut all_text = String::new(); // 全テキストパート連結用バッファ
+        let mut all_html = String::new(); // 全HTMLパート連結用バッファ
+        
+        // テキストパート本文を出力
         for (idx, _) in text_indices.iter().enumerate() {
-            // text/plain, text/html以外のテキストパートは本文出力をスキップ
-            // （例：text/calendar等の特殊なテキストパート）
-            let part = &msg.parts[text_indices[idx]]; // 対象パートを取得
+            let part = &msg.parts[text_indices[idx]]; // 対象テキストパートの取得
             
-            // Content-Typeのサブタイプ（plain, html等）を小文字で取得
-            let subtype = part.content_type().and_then(|ct| ct.c_subtype.as_deref().map(|s| s.to_ascii_lowercase()));
-            
+            // パートのサブタイプ（text/plain, text/htmlなど）を取得
+            let subtype = part.content_type()
+                .and_then(|ct| ct.c_subtype.as_deref().map(|s| s.to_ascii_lowercase()));
+                
             if let Some(subtype) = subtype {
-                // サブタイプがplainまたはhtmlの場合のみ本文出力
+                // plainまたはhtmlのテキストパートのみ処理
                 if subtype == "plain" || subtype == "html" {
-                    // mail-parserの本文抽出メソッドでテキスト/HTML本文を取得
-                    let text = msg.body_text(idx); // プレーンテキスト本文
-                    let html = msg.body_html(idx); // HTML本文
+                    let text = msg.body_text(idx); // プレーンテキスト本文取得
+                    let html = msg.body_html(idx); // HTML本文取得
                     
-                    // テキスト本文があれば出力（ISO-2022-JP等からデコード済み）
+                    // プレーンテキスト本文があれば出力
                     if let Some(body) = text {
-                        crate::printdaytimeln!("[mail-parser] TEXT本文({}): {}", idx + 1, body);
+                        crate::printdaytimeln!(LOG_TRACE, "[parser] TEXT本文({}): {}", idx + 1, body); // テキスト本文出力
+                        all_text.push_str(&body); // 連結用バッファに追加
+                        all_text.push('\n'); // パート間の区切り改行
                     }
                     
-                    // HTML本文があれば出力（quoted-printable等からデコード済み）
+                    // HTML本文があれば出力
                     if let Some(html_body) = html {
-                        crate::printdaytimeln!("[mail-parser] HTML本文({}): {}", idx + 1, html_body);
+                        crate::printdaytimeln!(LOG_TRACE, "[parser] HTML本文({}): {}", idx + 1, html_body); // HTML本文出力
+                        all_html.push_str(&html_body); // 連結用バッファに追加
+                        all_html.push('\n'); // パート間の区切り改行
                     }
                 }
-                // text/plain, text/html以外は本文出力しない（スキップ）
             }
-            // Content-Typeが不明な場合も本文出力しない（スキップ）
         }
-        // 添付ファイル等の非テキストパート情報出力処理
-        let mut non_text_idx = 0; // 非テキストパートの出力用連番（1から開始）
+
+        // === 非テキストパート（添付ファイル等）の情報抽出・出力処理 ===
+        let mut non_text_idx = 0; // 非テキストパートの出力用インデックス
         
-        // 全パートを再度走査して非テキストパートの詳細情報を出力
+        // 非テキストパート情報を出力
         for part in msg.parts.iter() {
-            // テキストパート以外（添付ファイル、画像等）のみ処理
             if !part.is_text() {
-                // Content-Type情報をヘッダから抽出（MIMEタイプ特定用）
-                let ct = part
-                    .headers
-                    .iter()
-                    .find(|h| h.name().eq_ignore_ascii_case("content-type")) // Content-Typeヘッダを検索
-                    .map(|h| format!("{:?}", h.value())) // ヘッダ値を文字列として整形
-                    .unwrap_or("(不明)".to_string()); // Content-Typeが無い場合のデフォルト値
+                // Content-Type取得（MIMEタイプ情報）
+                let ct = part.headers.iter()
+                    .find(|h| h.name().eq_ignore_ascii_case("content-type"))
+                    .map(|h| format!("{:?}", h.value()))
+                    .unwrap_or("(不明)".to_string());
+                    
+                // エンコーディング取得（Base64, quoted-printable等）
+                let encoding_str = format!("{:?}", part.encoding);
                 
-                // Content-Transfer-Encodingの種別を文字列化（base64, quoted-printable等）
-                let encoding_str = format!("{:?}", part.encoding); // エンコーディング情報
-                
-                // ファイル名情報を複数のヘッダから抽出
-                let fname = part
-                    .content_disposition() // Content-Disposition属性を取得
+                // ファイル名取得（Content-Disposition優先、なければContent-Typeのname属性）
+                let fname = part.content_disposition()
                     .and_then(|cd| {
-                        // filename属性を検索（一般的な添付ファイル名指定）
-                        cd.attributes()
-                            .unwrap_or(&[])
+                        cd.attributes().unwrap_or(&[])
                             .iter()
                             .find(|attr| attr.name.eq_ignore_ascii_case("filename"))
                             .map(|attr| attr.value.to_string())
                     })
                     .or_else(|| {
-                        // Content-Typeのname属性も補助的にチェック（古い形式対応）
-                        part.content_type()
-                            .and_then(|ct| {
-                                ct.attributes()
-                                    .unwrap_or(&[])
-                                    .iter()
-                                    .find(|attr| attr.name.eq_ignore_ascii_case("name"))
-                                    .map(|attr| attr.value.to_string())
-                            })
+                        part.content_type().and_then(|ct| {
+                            ct.attributes().unwrap_or(&[])
+                                .iter()
+                                .find(|attr| attr.name.eq_ignore_ascii_case("name"))
+                                .map(|attr| attr.value.to_string())
+                        })
                     })
-                    .unwrap_or_else(|| "(ファイル名なし)".to_string()); // どちらにもファイル名が無い場合
+                    .unwrap_or_else(|| "(ファイル名なし)".to_string());
+                    
+                let size = part.body.len(); // パートサイズ（バイト数）
                 
-                let size = part.body.len(); // パートの生データサイズ（バイト数）
-                
-                // 非テキストパートの詳細情報を1行で出力
+                // 非テキストパート詳細情報の出力
                 crate::printdaytimeln!(
-                    "[mail-parser] 非テキストパート({}): content_type={}, encoding={}, filename={}, size={} bytes",
+                    LOG_TRACE,
+                    "[parser] 非テキストパート({}): content_type={}, encoding={}, filename={}, size={} bytes",
                     non_text_idx + 1, ct, encoding_str, fname, size
-                );
-                
-                non_text_idx += 1; // 次の非テキストパート用に連番を進める
+                ); // 非テキストパート情報出力
+                non_text_idx += 1; // インデックスを次へ
             }
         }
-    } else {
-        // パース失敗時（メール構造が不正等）
-        crate::printdaytimeln!("[mail-parser] parse error"); // パース失敗ログ
+
+        // === 生ヘッダー情報をフィルター用データに変換・格納 ===
+        let mut header_fields_for_filter = HashMap::new();
+        for (k, vlist) in header_fields {
+            let joined = vlist.join(", "); // ヘッダ値をカンマ区切りで連結
+            let key_lower = k.to_ascii_lowercase(); // ヘッダ名を小文字化
+            
+            // 主要ヘッダ（from, to, subject）の処理
+            match key_lower.as_str() {
+                "from" | "to" | "subject" => {
+                    header_fields_for_filter.insert(format!("header_{}", key_lower), joined); // header_接頭辞付きで格納
+                }
+                _ => {
+                    header_fields_for_filter.insert(key_lower, joined); // その他ヘッダはそのまま格納
+                }
+            }
+        }
+        
+        // パース結果の構造体を構築して返却
+        return Some(ParsedMail {
+            decode_from: from,
+            decode_to: to,
+            decode_subject: subject.to_string(),
+            decode_text: all_text,
+            decode_html: all_html,
+            header_fields: header_fields_for_filter,
+        });
     }
-} // parse_mail関数終端
+    
+    // パース失敗時はNoneを返す
+    None // パース失敗：Noneを返却
+}

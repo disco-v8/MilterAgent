@@ -7,10 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2024-07-22
+### Added
+- Enhanced phishing detection filters for major Japanese organizations:
+  - Banking and financial services (MUFG, Mizuho, SMBC, etc.)
+  - Transportation (JR companies, airlines, private railways)
+  - Shipping companies (Japan Post, Yamato Transport, Sagawa Express, DHL)
+  - E-commerce and online services
+- Modular configuration system with include directory support
+- Configurable log levels (info, trace, debug) with JST timestamps
+- Signal handling for graceful shutdown and configuration reload
+- Cross-platform support (Unix and Windows)
+- GitHub Actions CI/CD pipeline
+- Comprehensive documentation in English and Japanese
+
+### Changed
+- Simplified response packet building with standardized parameters
+- Improved error handling and protocol compliance
+- Enhanced logging system with level-based filtering
+
+## [0.1.0] - 2025-07-23
 
 ### Added
-- Initial release of MilterDecoder
+- Initial release of MilterAgent
 - Full Milter protocol implementation compatible with Postfix/Sendmail
 - Asynchronous TCP server using Tokio runtime
 - MIME email parsing with mail-parser crate
@@ -21,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Attachment detection with filename extraction
   - Text/non-text part classification
 - JST timestamp logging with chrono-tz
-- Configuration file support (`MilterDecoder.conf`)
+- Configuration file support (`MilterAgent.conf`)
 - Signal handling:
   - SIGHUP for configuration reload
   - SIGTERM for graceful shutdown
@@ -51,6 +69,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - chrono 0.4 (date/time handling)
 - chrono-tz 0.8 (timezone support)
 - lazy_static 1.5.0 (global variables)
-
-[Unreleased]: https://github.com/disco-v8/MilterDecoder/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/disco-v8/MilterDecoder/releases/tag/v0.1.0
