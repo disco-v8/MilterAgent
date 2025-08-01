@@ -89,7 +89,7 @@ pub fn parse_mail(
     for (k, vlist) in header_fields {
         // 同一ヘッダ名で複数値がある場合（Received等）も全て処理
         for v in vlist {
-            mail_string.push_str(&format!("{}: {}\r\n", k, v)); // RFC準拠のCRLF改行
+            mail_string.push_str(&format!("{k}: {v}\r\n")); // RFC準拠のCRLF改行
         }
     }
 

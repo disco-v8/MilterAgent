@@ -468,7 +468,7 @@ pub async fn send_milter_response(
             // WARN応答の場合はADDHEADERコマンド(0x68)を送信
             let reply_packet = build_response_packet(
                 0x68u8, // ADDHEADERコマンド メッセージ部分の先頭には半角スペースをつけないと、つながってしまう
-                &format!("X-MilterAgent\0 Warning: '{}' by MilterAgent", logname),
+                &format!("X-MilterAgent\0 Warning: '{logname}' by MilterAgent"),
             );
             if let Err(e) = stream.write_all(&reply_packet).await {
                 crate::printdaytimeln!(
@@ -485,7 +485,7 @@ pub async fn send_milter_response(
             // REJECT応答の場合はREPLYCODEコマンド(0x79)を送信
             let reply_packet = build_response_packet(
                 0x79u8, // REPLYCODEコマンド
-                &format!("550 5.7.1 Rejected: '{}' by MilterAgent", logname),
+                &format!("550 5.7.1 Rejected: '{logname}' by MilterAgent"),
             );
             if let Err(e) = stream.write_all(&reply_packet).await {
                 crate::printdaytimeln!(
@@ -536,7 +536,7 @@ pub async fn send_milter_response(
 
 fn build_response_packet(response_code: u8, response_message: &str) -> Vec<u8> {
     // 応答内容（null終端）
-    let payload = format!("{}\0", response_message);
+    let payload = format!("{response_message}\0");
     let bytes = payload.as_bytes();
 
     let mut packet = Vec::with_capacity(4 + 1 + bytes.len());

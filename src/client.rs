@@ -288,7 +288,7 @@ pub async fn handle_client(
                 if !payload.is_empty() {
                     let hexstr = payload
                         .iter()
-                        .map(|b| format!("{:02X}", b))
+                        .map(|b| format!("{b:02X}"))
                         .collect::<Vec<_>>()
                         .join(" "); // 16進ダンプ生成
                     crate::printdaytimeln!(LOG_DEBUG, "[client] ペイロード: {}", hexstr);

@@ -98,7 +98,7 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                 if addr.contains(':') {
                     *address = Some(addr.to_string()); // host:port形式
                 } else {
-                    *address = Some(format!("[::]:{}", addr)); // ポートのみ指定時はIPv6全体
+                    *address = Some(format!("[::]:{addr}")); // ポートのみ指定時はIPv6全体
                 }
             }
             // Client_timeout設定（クライアント無通信タイムアウト秒）

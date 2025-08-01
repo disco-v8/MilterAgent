@@ -86,7 +86,7 @@ async fn main() {
         // SIGTERM受信: サーバー安全終了
         tokio::spawn(async move {
             let mut term = signal(SignalKind::terminate()).expect("SIGTERM登録失敗");
-            while term.recv().await.is_some() {
+            if let Some(_) = term.recv().await {
                 printdaytimeln!(LOG_INFO, "[main] SIGTERM受信: サーバー安全終了");
                 let _ = shutdown_tx_term.send(()); // 全クライアントへ終了通知
                 std::process::exit(0); // プロセス終了
