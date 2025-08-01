@@ -123,7 +123,7 @@ pub fn parse_mail(
                         let name = addr.name().unwrap_or(""); // 差出人名（表示名）
                         let address = addr.address().unwrap_or(""); // メールアドレス
                         if !name.is_empty() {
-                            format!("{} <{}>", name, address) // 名前付きフォーマット
+                            format!("{name} <{address}>") // 名前付きフォーマット
                         } else {
                             address.to_string() // アドレスのみ
                         }
@@ -143,7 +143,7 @@ pub fn parse_mail(
                         let name = addr.name().unwrap_or(""); // 宛先名（表示名）
                         let address = addr.address().unwrap_or(""); // 宛先メールアドレス
                         if !name.is_empty() {
-                            format!("{} <{}>", name, address) // 名前付きフォーマット
+                            format!("{name} <{address}>") // 名前付きフォーマット
                         } else {
                             address.to_string() // アドレスのみ
                         }
