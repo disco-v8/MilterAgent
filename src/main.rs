@@ -73,7 +73,7 @@ async fn main() {
         let config_path = Arc::clone(&config_path); // 設定ファイルパス参照用
         let shutdown_tx_hup = shutdown_tx.clone(); // SIGHUP用
         let shutdown_tx_term = shutdown_tx.clone(); // SIGTERM用
-                                                    // SIGHUP受信: 設定ファイル再読込
+        // SIGHUP受信: 設定ファイル再読込
         tokio::spawn(async move {
             let mut hup = signal(SignalKind::hangup()).expect("SIGHUP登録失敗");
             while hup.recv().await.is_some() {
