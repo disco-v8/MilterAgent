@@ -1,0 +1,15 @@
+[Unit]
+Description=MilterAgent Service
+Documentation=https://github.com/disco-v8/MilterAgent
+After=network.target
+Before=postfix.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/milteragent
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+TimeoutStopSec=10s
+
+[Install]
+WantedBy=multi-user.target
