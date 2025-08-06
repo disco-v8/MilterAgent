@@ -165,7 +165,9 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                     let mut rules = Vec::new();
                     // 各ルールをパース
                     for rule in rule_list {
-                        let parts: Vec<&str> = rule.split(':').collect();
+                        // エスケープされた:を一時的に特殊文字に置換してから分割
+                        let rule_escaped = rule.replace("\\:", "\x00"); // \:を一時的にNULL文字に置換
+                        let parts: Vec<&str> = rule_escaped.split(':').collect();
                         // キー:パターン:アクション（OR/AND不要）
                         if parts.len() == 3 {
                             let key = parts[0].trim().trim_matches('"'); // キー
@@ -174,9 +176,9 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                             } else {
                                 (false, parts[1])
                             };
-                            let pattern = pattern_raw.trim().trim_matches('"'); // 正規表現
-                            if let Ok(regex) = Regex::new(pattern) {
-                                let action = parts[2].trim().trim_matches('"'); // アクション
+                            let pattern = pattern_raw.trim().trim_matches('"').replace('\x00', ":"); // 正規表現（:を復元）
+                            if let Ok(regex) = Regex::new(&pattern) {
+                                let action = parts[2].trim().trim_matches('"').replace('\x00', ":"); // アクション（:を復元）
                                 rules.push(FilterRule {
                                     key: key.to_string(),
                                     regex,
@@ -194,10 +196,10 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                             } else {
                                 (false, parts[1])
                             };
-                            let pattern = pattern_raw.trim().trim_matches('"');
-                            if let Ok(regex) = Regex::new(pattern) {
-                                let logic = parts[2].trim().trim_matches('"'); // AND/OR
-                                let action = parts[3].trim().trim_matches('"'); // アクション
+                            let pattern = pattern_raw.trim().trim_matches('"').replace('\x00', ":");
+                            if let Ok(regex) = Regex::new(&pattern) {
+                                let logic = parts[2].trim().trim_matches('"').replace('\x00', ":"); // AND/OR（:を復元）
+                                let action = parts[3].trim().trim_matches('"').replace('\x00', ":"); // アクション（:を復元）
                                 rules.push(FilterRule {
                                     key: key.to_string(),
                                     regex,
