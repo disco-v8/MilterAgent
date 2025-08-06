@@ -6,7 +6,7 @@ Before=postfix.service
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/milteragent
+ExecStart=/usr/sbin/milter_agent
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 TimeoutStopSec=10s
