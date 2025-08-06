@@ -43,9 +43,17 @@ MilterAgent is a comprehensive email security solution that implements the Milte
 ### Building from Source
 
 ```bash
-git clone https://github.com/yourusername/MilterAgent.git
-cd MilterAgent
+cd /usr/src/
+git clone https://github.com/disco-v8/MilterAgent.git
+mv MilterAgent "MilterAgent-$(date +%Y%m%d)"
+cd /usr/src/"MilterAgent-$(date +%Y%m%d)"
+
 cargo build --release
+
+/bin/cp -af ./target/release/milter_agent /usr/sbin/
+rsync -av ./logrotate.d/milter_agent /etc/logrotate.d/
+rsync -av ./systemd/milter_agent.service /usr/lib/systemd/system/
+rsync -av ./etc/ /etc/
 ```
 
 ## Configuration
@@ -73,6 +81,14 @@ Place filter files in the `MilterAgent.d/` directory:
 - `filter_transport.conf` - Transportation and logistics filters
 - Additional filter files as needed
 
+If you want to start with WARN (adding only a header) instead of REJECT, please perform the following batch replacement.
+
+```
+chmod 700 /etc/MilterAgent.d/reject2warn.sh
+cd /etc/MilterAgent.d/
+./reject2warn.sh
+```
+
 ### Filter Syntax
 
 ```
@@ -96,11 +112,14 @@ filter[filter_name] =
 ### Starting the Server
 
 ```bash
-# With default configuration
-./target/release/milter_agent
+systemctl daemon-reload
+systemctl --no-pager status milter_agent
 
-# With custom configuration file
-./target/release/milter_agent -f /path/to/config.conf
+systemctl enable milter_agent
+systemctl --no-pager status milter_agent
+
+systemctl start milter_agent
+systemctl --no-pager status milter_agent
 ```
 
 ### Mail Server Integration
@@ -137,10 +156,12 @@ INPUT_MAIL_FILTER(`milteragent', `S=inet:8898@127.0.0.1')
 
 ```bash
 # Reload configuration
-kill -HUP $(pidof milter_agent)
+systemctl reload milter_agent
+systemctl --no-pager status milter_agent
 
 # Graceful shutdown
-kill -TERM $(pidof milter_agent)
+systemctl stop milter_agent
+systemctl --no-pager status milter_agent
 ```
 
 ## Logging

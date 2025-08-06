@@ -39,9 +39,17 @@ MilterAgentは、リアルタイムメールフィルタリングのためのMil
 ### ソースからのビルド
 
 ```bash
-git clone https://github.com/yourusername/MilterAgent.git
-cd MilterAgent
+cd /usr/src/
+git clone https://github.com/disco-v8/MilterAgent.git
+mv MilterAgent "MilterAgent-$(date +%Y%m%d)"
+cd /usr/src/"MilterAgent-$(date +%Y%m%d)"
+
 cargo build --release
+
+/bin/cp -af ./target/release/milter_agent /usr/sbin/
+rsync -av ./logrotate.d/milter_agent /etc/logrotate.d/
+rsync -av ./systemd/milter_agent.service /usr/lib/systemd/system/
+rsync -av ./etc/ /etc/
 ```
 
 ## 設定
@@ -69,6 +77,14 @@ include MilterAgent.d
 - `filter_transport.conf` - 交通・物流フィルター
 - 必要に応じて追加のフィルターファイル
 
+REJECT（拒否）ではなくWARN（ヘッダー追加のみ）で開始したい場合は、以下の一括置換を実行してください。
+
+```
+chmod 700 /etc/MilterAgent.d/reject2warn.sh
+cd /etc/MilterAgent.d/
+./reject2warn.sh
+```
+
 ### フィルター構文
 
 ```
@@ -92,11 +108,14 @@ filter[フィルター名] =
 ### サーバー起動
 
 ```bash
-# デフォルト設定で起動
-./target/release/milter_agent
+systemctl daemon-reload
+systemctl --no-pager status milter_agent
 
-# カスタム設定ファイルで起動
-./target/release/milter_agent -f /path/to/config.conf
+systemctl enable milter_agent
+systemctl --no-pager status milter_agent
+
+systemctl start milter_agent
+systemctl --no-pager status milter_agent
 ```
 
 ### メールサーバー統合
@@ -133,10 +152,12 @@ INPUT_MAIL_FILTER(`milteragent', `S=inet:8898@127.0.0.1')
 
 ```bash
 # 設定リロード
-kill -HUP $(pidof milter_agent)
+systemctl reload milter_agent
+systemctl --no-pager status milter_agent
 
 # 安全な終了
-kill -TERM $(pidof milter_agent)
+systemctl stop milter_agent
+systemctl --no-pager status milter_agent
 ```
 
 ## ログ
