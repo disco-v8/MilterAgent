@@ -19,6 +19,9 @@ Thumbs.db
 # Configuration (optional - remove if you want to include sample config)
 # MilterAgent.conf
 
+# Include etc/ directory for configuration examples
+!etc/
+
 # Build artifacts
 *.exe
 *.pdb
