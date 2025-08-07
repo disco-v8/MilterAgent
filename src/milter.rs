@@ -278,7 +278,7 @@ pub async fn decode_helo(stream: &mut tokio::net::TcpStream, payload: &[u8], pee
 /// - crate::milter_command::MilterMacro: マクロ種別enum（Postfix/Sendmail互換）
 /// - std: バイトスライス分割・文字列変換
 pub fn decode_data_macros(
-    payload: &[u8], 
+    payload: &[u8],
     is_header_block: &mut bool,
     macro_fields: &mut std::collections::HashMap<String, String>,
 ) {

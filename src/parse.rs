@@ -127,24 +127,24 @@ pub fn parse_mail(
             // "unknown [81.30.107.177]" のような形式から情報を抽出
             let mut host = "unknown".to_string();
             let mut ip = "unknown".to_string();
-            
+
             // IPアドレス部分を抽出 "[xxx.xxx.xxx.xxx]" 形式
             if let Some(start) = macro_space.find('[') {
                 if let Some(end) = macro_space.find(']') {
-                    ip = macro_space[start+1..end].to_string();
+                    ip = macro_space[start + 1..end].to_string();
                 }
             }
-            
+
             // ホスト名部分を抽出（IP部分より前）
             if let Some(bracket_pos) = macro_space.find('[') {
                 host = macro_space[..bracket_pos].trim().to_string();
             }
-            
+
             (host, ip)
         } else {
             ("unknown".to_string(), "unknown".to_string())
         };
-        
+
         // 基本情報の出力1
         crate::printdaytimeln!(LOG_INFO, "[parser] remote_host: {}", remote_host);
         crate::printdaytimeln!(LOG_INFO, "[parser] remote_ip: {}", remote_ip);
