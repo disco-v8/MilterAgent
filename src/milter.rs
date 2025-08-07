@@ -250,17 +250,18 @@ pub async fn decode_helo(stream: &mut tokio::net::TcpStream, payload: &[u8], pee
 /// # 引数
 /// - `payload`: DATAコマンドのペイロード（0x00区切りのマクロ名・値バイト列）
 /// - `is_header_block`: ヘッダブロック判定フラグ（SOHマクロ検出時にtrueに設定）
+/// - `macro_fields`: マクロ情報を格納するHashMap（SMTPセッション情報保存用）
 ///
 /// # 説明
 /// Milterプロトコルで受信したDATAコマンドのマクロペイロードを解析し、
-/// 各フェーズ（DATA/CONNECT/HELO/SOH等）のマクロ名・値を出力する。
+/// 各フェーズ（DATA/CONNECT/HELO/SOH等）のマクロ名・値を出力し、macro_fieldsに格納する。
 /// 先頭バイトでマクロ種別を判定し、拡張マクロ（{name}形式）にも対応。
 ///
 /// # 処理フロー
 /// 1. ペイロードを0x00区切りで分割してマクロ要素を抽出
 /// 2. 先頭バイトからマクロフェーズ（DATA/SOH等）を判定
 /// 3. SOHマクロ検出時はヘッダブロックフラグを設定
-/// 4. 先頭マクロ名・値の抽出と出力
+/// 4. 先頭マクロ名・値の抽出と出力・格納
 /// 5. 残りマクロの順次処理（名前・値のペア単位）
 ///
 /// # 技術詳細
@@ -276,7 +277,11 @@ pub async fn decode_helo(stream: &mut tokio::net::TcpStream, payload: &[u8], pee
 /// 【この関数で使う主なクレート】
 /// - crate::milter_command::MilterMacro: マクロ種別enum（Postfix/Sendmail互換）
 /// - std: バイトスライス分割・文字列変換
-pub fn decode_data_macros(payload: &[u8], is_header_block: &mut bool) {
+pub fn decode_data_macros(
+    payload: &[u8], 
+    is_header_block: &mut bool,
+    macro_fields: &mut std::collections::HashMap<String, String>,
+) {
     use crate::milter_command::MilterMacro;
 
     // Step 1: ペイロードを0x00区切りで分割してマクロ要素を抽出
@@ -330,6 +335,8 @@ pub fn decode_data_macros(payload: &[u8], is_header_block: &mut bool) {
             macro_name,
             macro_val
         );
+        // 先頭マクロ情報をHashMapに格納（フィルタリング処理で使用）
+        macro_fields.insert(macro_name.clone(), macro_val.clone());
     }
 
     // Step 5: 残りマクロの順次処理（名前・値のペア単位で2つずつ処理）
@@ -363,6 +370,8 @@ pub fn decode_data_macros(payload: &[u8], is_header_block: &mut bool) {
             macro_name,
             macro_val
         );
+        // 残りマクロ情報をHashMapに格納（フィルタリング処理で使用）
+        macro_fields.insert(macro_name.clone(), macro_val.clone());
         idx += 2; // 次のマクロペア（名前・値）へ移動
     }
 }

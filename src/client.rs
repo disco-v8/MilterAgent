@@ -59,7 +59,10 @@ pub async fn handle_client(
     let mut is_body_eob = false; // BODY受信後にEOHをBODYEOBとして扱う
                                  // DATAコマンドでヘッダブロック開始/終了を判定
     let mut is_header_block = false; // ヘッダブロック中かどうか
-                                     // ヘッダ情報（複数値対応）
+                                     // マクロ情報（SMTPセッション情報）
+    let mut macro_fields: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new(); // マクロ格納用
+                                          // ヘッダ情報（複数値対応）
     let mut header_fields: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new(); // ヘッダ格納用
                                           // ボディ情報
@@ -230,7 +233,7 @@ pub async fn handle_client(
                 decode_helo(&mut stream, &payload, &peer_addr).await; // HELO応答
             } else if let MilterCommand::Data = cmd {
                 // DATAコマンド時(のマクロ処理)（milter.rsに分離）
-                decode_data_macros(&payload, &mut is_header_block); // マクロ情報処理
+                decode_data_macros(&payload, &mut is_header_block, &mut macro_fields); // マクロ情報処理
                                                                     // DATAコマンドではCONTINUE応答を送信しなくてもよい
             } else if let MilterCommand::Header = cmd {
                 // SMFIC_HEADER(0x4C)コマンド時、ペイロードをヘッダ配列に格納＆出力（milter.rsに分離）
@@ -246,7 +249,7 @@ pub async fn handle_client(
             } else if let MilterCommand::Eoh = cmd {
                 if is_body_eob {
                     // パース処理でメール全体をパース・デバッグ出力・構造化
-                    if let Some(parsed_mail) = parse_mail(&header_fields, &body_field) {
+                    if let Some(parsed_mail) = parse_mail(&header_fields, &body_field, &macro_fields) {
                         // フィルター用のHashMapに効率的に変換（構造体メソッド使用）
                         let mail_values = parsed_mail.into_hash_map();
                         // フィルター判定を実行（並列処理版）
@@ -277,7 +280,8 @@ pub async fn handle_client(
                 }
                 // BODYEOB(=is_body_eob==true)のときのみ、直前のヘッダ情報とボディ情報を出力
                 if is_body_eob {
-                    // BODYEOB時はヘッダ・ボディ情報をクリア
+                    // BODYEOB時はヘッダ・ボディ・マクロ情報をクリア
+                    macro_fields.clear(); // マクロ初期化
                     header_fields.clear(); // ヘッダ初期化
                     body_field.clear(); // ボディ初期化
                     is_body_eob = false; // BODYEOB→EOH遷移

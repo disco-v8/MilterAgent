@@ -25,12 +25,15 @@ use crate::init::{LOG_DEBUG, LOG_INFO, LOG_TRACE};
 /// パース済みメール情報の構造体
 #[derive(Debug, Clone)]
 pub struct ParsedMail {
+    pub decode_remote_host: String,
+    pub decode_remote_ip: String,
     pub decode_from: String,
     pub decode_to: String,
     pub decode_subject: String,
     pub decode_text: String,
     pub decode_html: String,
     pub header_fields: HashMap<String, String>,
+    pub macro_fields: HashMap<String, String>,
 }
 
 impl ParsedMail {
@@ -47,12 +50,16 @@ impl ParsedMail {
         let mut map = HashMap::new();
 
         // デコード済み情報を格納
+        map.insert("decode_remote_host".to_string(), self.decode_remote_host);
+        map.insert("decode_remote_ip".to_string(), self.decode_remote_ip);
         map.insert("decode_from".to_string(), self.decode_from);
         map.insert("decode_to".to_string(), self.decode_to);
         map.insert("decode_subject".to_string(), self.decode_subject);
         map.insert("decode_text".to_string(), self.decode_text);
         map.insert("decode_html".to_string(), self.decode_html);
 
+        // マクロ情報をマージ
+        map.extend(self.macro_fields);
         // 生ヘッダー情報をマージ（既存のキーがあれば上書き）
         map.extend(self.header_fields);
 
@@ -65,6 +72,7 @@ impl ParsedMail {
 /// # 引数
 /// - `header_fields`: Milterで受信したヘッダ情報（HashMap<String, Vec<String>>）
 /// - `body_field`: Milterで受信したボディ情報（文字列）
+/// - `macro_fields`: Milterで受信したマクロ情報（HashMap<String, String>）
 ///
 /// # 戻り値
 /// - Some(ParsedMail): パース成功時の構造化データ
@@ -81,6 +89,7 @@ impl ParsedMail {
 pub fn parse_mail(
     header_fields: &HashMap<String, Vec<String>>,
     body_field: &str,
+    macro_fields: &HashMap<String, String>,
 ) -> Option<ParsedMail> {
     // ヘッダ情報とボディ情報を合体し、RFC準拠のメール全体文字列を作成
     let mut mail_string = String::new(); // メール全体の文字列構築用バッファ
@@ -112,6 +121,33 @@ pub fn parse_mail(
     let parser = MessageParser::default(); // パーサーインスタンス生成（デフォルト設定）
     if let Some(msg) = parser.parse(mail_string.as_bytes()) {
         // === パース成功時の処理開始 ===
+
+        // === マクロ情報から接続情報を抽出 ===
+        let (remote_host, remote_ip) = if let Some(macro_space) = macro_fields.get("MACRO_Space") {
+            // "unknown [81.30.107.177]" のような形式から情報を抽出
+            let mut host = "unknown".to_string();
+            let mut ip = "unknown".to_string();
+            
+            // IPアドレス部分を抽出 "[xxx.xxx.xxx.xxx]" 形式
+            if let Some(start) = macro_space.find('[') {
+                if let Some(end) = macro_space.find(']') {
+                    ip = macro_space[start+1..end].to_string();
+                }
+            }
+            
+            // ホスト名部分を抽出（IP部分より前）
+            if let Some(bracket_pos) = macro_space.find('[') {
+                host = macro_space[..bracket_pos].trim().to_string();
+            }
+            
+            (host, ip)
+        } else {
+            ("unknown".to_string(), "unknown".to_string())
+        };
+        
+        // 基本情報の出力1
+        crate::printdaytimeln!(LOG_INFO, "[parser] remote_host: {}", remote_host);
+        crate::printdaytimeln!(LOG_INFO, "[parser] remote_ip: {}", remote_ip);
 
         // === 差出人（From）情報の抽出・整形 ===
         let from = msg
@@ -156,7 +192,7 @@ pub fn parse_mail(
         // === 件名（Subject）情報の抽出 ===
         let subject = msg.subject().unwrap_or("(なし)"); // 件名無し時のデフォルト値
 
-        // 基本情報の出力
+        // 基本情報の出力2
         crate::printdaytimeln!(LOG_INFO, "[parser] from: {}", from); // From出力
         crate::printdaytimeln!(LOG_INFO, "[parser] to: {}", to); // To出力
         crate::printdaytimeln!(LOG_INFO, "[parser] subject: {}", subject); // 件名出力
@@ -312,6 +348,17 @@ pub fn parse_mail(
             }
         }
 
+        // === マクロ情報をフィルター用データに変換・格納 ===
+        let mut macro_fields_for_filter = HashMap::new();
+        macro_fields_for_filter.insert("macro_remote_host".to_string(), remote_host.clone());
+        macro_fields_for_filter.insert("macro_remote_ip".to_string(), remote_ip.clone());
+
+        // その他のマクロ情報も格納
+        for (k, v) in macro_fields {
+            let key_lower = k.to_ascii_lowercase(); // マクロ名を小文字化
+            macro_fields_for_filter.insert(format!("macro_{key_lower}"), v.clone());
+        }
+
         // === 生ヘッダー情報をフィルター用データに変換・格納 ===
         let mut header_fields_for_filter = HashMap::new();
         for (k, vlist) in header_fields {
@@ -332,12 +379,15 @@ pub fn parse_mail(
 
         // パース結果の構造体を構築して返却
         return Some(ParsedMail {
+            decode_remote_host: remote_host,
+            decode_remote_ip: remote_ip,
             decode_from: from,
             decode_to: to,
             decode_subject: subject.to_string(),
             decode_text: all_text,
             decode_html: all_html,
             header_fields: header_fields_for_filter,
+            macro_fields: macro_fields_for_filter,
         });
     }
 
