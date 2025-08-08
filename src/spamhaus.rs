@@ -22,7 +22,7 @@ use crate::init::{Config, LOG_INFO};
 ///
 /// # 引数
 /// - `ip_address`: レポートする送信元IPアドレス
-/// - `evidence`: スパムの証拠（ヘッダ情報やフィルタールールなど）
+/// - `reason`: スパムレポートの理由（フィルタールール名など、最大255文字）
 /// - `config`: 設定情報（APIトークンとURLを含む）
 ///
 /// # 戻り値
@@ -34,7 +34,7 @@ use crate::init::{Config, LOG_INFO};
 /// レポート送信はHTTPSで行われ、非同期処理として実装されています。
 pub async fn report_to_spamhaus(
     ip_address: &str, // 報告対象のスパム送信元IPアドレス
-    evidence: &str,   // スパム判定の根拠情報（フィルタールール名など）
+    reason: &str,     // スパムレポートの理由（フィルタールール名など、最大255文字）
     config: &Config,  // APIトークンやURLを含む設定情報
 ) -> Result<(), Box<dyn std::error::Error>> {
     // --- フェーズ1: 設定値の取得と検証 ---
@@ -67,12 +67,13 @@ pub async fn report_to_spamhaus(
     }
 
     // --- フェーズ2: リクエストデータの準備 ---
-    // レポートデータをJSON形式で構築（serde_jsonマクロ使用）
+    // Spamhaus API公式形式でレポートデータをJSON形式で構築
     let report_data = serde_json::json!({
-        "ip": ip_address,                         // 報告対象IPアドレス
-        "evidence": evidence,                     // スパム判定の根拠情報
-        "reporter": "MilterAgent",               // レポート送信元の識別子
-        "timestamp": chrono::Utc::now().to_rfc3339(), // UTC現在時刻（RFC3339形式）
+        "threat_type": "source-of-spam",         // 脅威タイプ（スパム送信元）
+        "reason": reason,                        // スパムレポートの理由（最大255文字）
+        "source": {
+            "object": ip_address                 // 報告対象IPアドレス
+        }
     });
 
     // --- フェーズ3: HTTPSクライアントの準備 ---
@@ -93,9 +94,9 @@ pub async fn report_to_spamhaus(
         // 成功時（2xx系ステータスコード）の処理
         crate::printdaytimeln!(
             LOG_INFO,
-            "[spamhaus] Report sending succeeded: IP={}, Evidence={}",
+            "[spamhaus] Report sending succeeded: IP={}, Reason={}",
             ip_address,
-            evidence
+            reason
         );
         Ok(()) // 正常終了を返す
     } else {

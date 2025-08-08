@@ -275,7 +275,7 @@ pub async fn handle_client(
                             if let Some(remote_ip) = mail_values.get("decode_remote_ip") {
                                 if let Err(e) = report_to_spamhaus(
                                     remote_ip,
-                                    &format!("Spam filtering \"{}\" with MilterAgent", logname),
+                                    &format!("Spam filtering {} with MilterAgent", logname),
                                     &config_val,
                                 )
                                 .await
