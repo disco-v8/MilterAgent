@@ -69,10 +69,10 @@ pub async fn report_to_spamhaus(
     // --- フェーズ2: リクエストデータの準備 ---
     // Spamhaus API公式形式でレポートデータをJSON形式で構築
     let report_data = serde_json::json!({
-        "threat_type": "source-of-spam",         // 脅威タイプ（スパム送信元）
-        "reason": reason,                        // スパムレポートの理由（最大255文字）
+        "threat_type": "spam",         // 脅威タイプ（スパム送信元）
+        "reason": reason,              // スパムレポートの理由（最大255文字）
         "source": {
-            "object": ip_address                 // 報告対象IPアドレス
+            "object": ip_address       // 報告対象IPアドレス
         }
     });
 
