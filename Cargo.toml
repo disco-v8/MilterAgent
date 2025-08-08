@@ -12,7 +12,7 @@ readme = "README.md"
 
 [dependencies]
 # Tokioランタイム（フル機能を使うためにfullを指定）
-tokio = { version = "1.38", features = ["full"] }
+tokio = { version = "1.47", features = ["full"] }
 reqwest = { version = "0.11", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 # 日時・タイムゾーン処理用
