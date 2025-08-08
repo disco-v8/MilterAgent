@@ -13,6 +13,15 @@ MilterAgentは、リアルタイムメールフィルタリングのためのMil
   - 配送・物流会社（日本郵便、ヤマト運輸、佐川急便、DHLなど）
   - 交通機関（JR各社、航空会社、私鉄など）
   - ECプラットフォーム・オンラインサービス
+- **Spamhaus API連携**: スパム送信者の自動報告機能:
+  - フィッシングメール送信元IPの自動検出と報告
+  - Spamhaus APIとの統合による脅威インテリジェンス共有
+  - 設定可能なAPI認証とエンドポイント
+  - 信頼できるネットワーク用のIPホワイトリスト（CIDR記法対応）
+- **高度な正規表現サポート**: fancy-regexによる強力な機能:
+  - 否定先読み（`(?!...)`）および肯定先読み（`(?=...)`）
+  - 否定後読み（`(?<!...)`）および肯定後読み（`(?<=...)`）
+  - 高度なメールフィルタリングのための複雑なパターンマッチング
 - **Milterプロトコルサポート**: シームレスな統合のための完全なMilterプロトコル実装
 - **リアルタイム処理**: 数千の同時接続を処理する非同期Rust実装
 - **高速並列フィルタリング**: マルチスレッド処理によるフィルター評価の並列実行で高速処理を実現
@@ -32,7 +41,7 @@ MilterAgentは、リアルタイムメールフィルタリングのためのMil
 
 ### 前提条件
 
-- Rust 1.70以降
+- Rust 1.80以降（Rust 2024 editionサポート付き）
 - Cargoパッケージマネージャー
 - 対応メールサーバー（Postfix、Sendmailなど）
 
@@ -101,6 +110,10 @@ filter[フィルター名] =
 - `Client_timeout`: クライアント非アクティブタイムアウト（秒）
 - `Log_file`: ログファイルパス（オプション、デフォルトは標準出力）
 - `Log_level`: ログ詳細度（`info`、`trace`、`debug`）
+- `Spamhaus_report`: Spamhaus APIへの報告を有効にする（`yes`/`no`、デフォルト: `no`）
+- `Spamhaus_api_token`: Spamhaus API認証トークン（オプション）
+- `Spamhaus_api_url`: Spamhaus APIエンドポイントURL（オプション）
+- `Spamhaus_safe_address`: Spamhaus報告から除外するIPアドレスまたはCIDRネットワーク（オプション、複数指定可能）
 - `include`: 追加設定ディレクトリをインクルード
 
 ## 使用方法
@@ -187,6 +200,73 @@ filter[phish_jreast] =
     "decode_from:(?i)(JR東日本|East Japan Railway):AND",
     "decode_from:!(@(.*\.)?jreast\.co\.jp|@(.*\.)?jre-vts\.com):REJECT"
 ```
+
+### 高度な否定先読みフィルター
+
+```
+filter[phish_monex_html] = 
+    "body:(?i)monex.*(?!.*\.?(monex\.co\.jp|monex\.com|on-compass\.com)\b):REJECT"
+```
+
+このフィルターは「monex」を含むが正規のMonexドメインからではないメールを検出し、金融サービスを騙るフィッシング攻撃を防ぎながら、正当な通信は許可します。
+
+## 依存関係
+
+- [tokio](https://tokio.rs/): 非同期ランタイム
+- [mail-parser](https://crates.io/crates/mail-parser): MIMEメール解析
+- [fancy-regex](https://crates.io/crates/fancy-regex): 先読み・後読み対応の高機能正規表現エンジン
+- [chrono](https://crates.io/crates/chrono): 日時処理
+- [chrono-tz](https://crates.io/crates/chrono-tz): タイムゾーンサポート
+- [reqwest](https://crates.io/crates/reqwest): API統合用HTTPクライアント
+- [serde](https://crates.io/crates/serde): シリアライゼーションフレームワーク
+
+## 変更履歴
+
+### v0.2.0 (2025-08-08)
+- **メジャーアップデート: Rust 2024 Editionサポート**
+  - Rust 2021から2024 editionにアップグレード
+  - パフォーマンス向上と最新言語機能の活用
+  - 標準ライブラリ統合の強化
+
+- **高度な正規表現エンジンのアップグレード**
+  - 標準の`regex`から`fancy-regex` 0.16に移行
+  - 否定先読み（`(?!...)`）および肯定先読み（`(?=...)`）のサポート追加
+  - 否定後読み（`(?<!...)`）および肯定後読み（`(?<=...)`）のサポート追加
+  - 高度なフィッシング検出パターンを実現
+
+- **Spamhaus API連携機能の追加**
+  - フィッシングメール送信元IPの自動検出と報告
+  - 設定可能なSpamhaus API認証とエンドポイント
+  - スパム判定されたメールの脅威インテリジェンス共有
+  - `Spamhaus_report`、`Spamhaus_api_token`、`Spamhaus_api_url`設定オプション追加
+  - IPホワイトリスト設定用の`Spamhaus_safe_address`を追加
+  - ネットワーク範囲除外のためのCIDR記法をサポート
+
+- **依存関係の最適化**
+  - 未使用の`lazy_static`依存関係を削除
+  - `once_cell`を標準ライブラリの`std::sync::OnceLock`に置換
+  - 外部依存関係を削減し、コンパイル時間を改善
+  - 全依存関係を最新の互換バージョンに更新
+
+- **コード品質の向上**
+  - 包括的なコードドキュメントとコメントの追加
+  - 正規表現マッチングでのエラーハンドリング改善
+  - コードの可読性と保守性の向上
+  - `cargo fmt`による一貫したフォーマット適用
+  - 全ての`cargo clippy`警告を解決
+
+- **設定システムの強化**
+  - 無効なフィルター設定に対するより良いエラーメッセージ
+  - 正規表現コンパイルエラー報告の改善
+  - 設定ファイル解析の堅牢性向上
+
+### v0.1.0
+- 初期リリース
+- 基本的なMilterプロトコル実装
+- MIMEメール解析と出力
+- 設定ファイルサポート
+- シグナル処理
+- JSTタイムスタンプログ
 
 ## 貢献
 

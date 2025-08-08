@@ -13,6 +13,15 @@ MilterAgent is a comprehensive email security solution that implements the Milte
   - Delivery and logistics companies (Japan Post, Yamato, Sagawa, DHL, etc.)
   - Transportation companies (JR, airlines, private railways, etc.)
   - E-commerce platforms and online services
+- **Spamhaus API Integration**: Automated spam sender reporting:
+  - Automatic detection and reporting of phishing email source IPs
+  - Integration with Spamhaus API for threat intelligence sharing
+  - Configurable API authentication and endpoints
+  - IP whitelist support with CIDR notation for trusted networks
+- **Advanced Regex Support**: Powered by fancy-regex with support for:
+  - Negative lookahead (`(?!...)`) and positive lookahead (`(?=...)`)
+  - Negative lookbehind (`(?<!...)`) and positive lookbehind (`(?<=...)`)
+  - Complex pattern matching for sophisticated email filtering
 - **Milter Protocol Support**: Full implementation of the Milter protocol for seamless integration
 - **Real-time Processing**: Asynchronous Rust implementation for handling thousands of concurrent connections
 - **High-Speed Parallel Filtering**: Multi-threaded filter evaluation with parallel execution for maximum performance
@@ -36,7 +45,7 @@ MilterAgent is a comprehensive email security solution that implements the Milte
 
 ### Prerequisites
 
-- Rust 1.70 or later
+- Rust 1.80 or later (with Rust 2024 edition support)
 - Cargo package manager
 - Compatible mail server (Postfix, Sendmail, etc.)
 
@@ -105,6 +114,10 @@ filter[filter_name] =
 - `Client_timeout`: Client inactivity timeout in seconds
 - `Log_file`: Path to log file (optional, defaults to stdout)
 - `Log_level`: Logging verbosity (`info`, `trace`, `debug`)
+- `Spamhaus_report`: Enable Spamhaus API reporting (`yes`/`no`, default: `no`)
+- `Spamhaus_api_token`: Spamhaus API authentication token (optional)
+- `Spamhaus_api_url`: Spamhaus API endpoint URL (optional)
+- `Spamhaus_safe_address`: IP addresses or CIDR networks to exclude from Spamhaus reporting (optional, can be specified multiple times)
 - `include`: Include additional configuration directories
 
 ## Usage
@@ -192,6 +205,15 @@ filter[phish_jreast] =
     "decode_from:!(@(.*\.)?jreast\.co\.jp|@(.*\.)?jre-vts\.com):REJECT"
 ```
 
+### Advanced Negative Lookahead Filter
+
+```
+filter[phish_monex_html] = 
+    "body:(?i)monex.*(?!.*\.?(monex\.co\.jp|monex\.com|on-compass\.com)\b):REJECT"
+```
+
+This filter detects emails containing "monex" but not from legitimate Monex domains, preventing phishing attempts that impersonate the financial service while allowing legitimate communications.
+
 ## Contributing
 
 1. Fork the repository
@@ -249,9 +271,11 @@ For issues, questions, or contributions, please use the GitHub issue tracker.
 
 - [tokio](https://tokio.rs/): Asynchronous runtime
 - [mail-parser](https://crates.io/crates/mail-parser): MIME email parsing
+- [fancy-regex](https://crates.io/crates/fancy-regex): Advanced regex engine with lookahead/lookbehind support
 - [chrono](https://crates.io/crates/chrono): Date and time handling
 - [chrono-tz](https://crates.io/crates/chrono-tz): Timezone support
-- [lazy_static](https://crates.io/crates/lazy_static): Global static variables
+- [reqwest](https://crates.io/crates/reqwest): HTTP client for API integration
+- [serde](https://crates.io/crates/serde): Serialization framework
 
 ## Development
 
@@ -293,6 +317,44 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For issues, questions, or contributions, please open an issue on GitHub.
 
 ## Changelog
+
+### v0.2.0 (2025-08-08)
+- **Major Update: Rust 2024 Edition Support**
+  - Upgraded from Rust 2021 to Rust 2024 edition
+  - Improved performance and latest language features
+  - Enhanced standard library integration
+
+- **Advanced Regex Engine Upgrade**
+  - Migrated from standard `regex` to `fancy-regex` 0.16
+  - Added support for negative lookahead (`(?!...)`) and positive lookahead (`(?=...)`)
+  - Added support for negative lookbehind (`(?<!...)`) and positive lookbehind (`(?<=...)`)
+  - Enables sophisticated phishing detection patterns
+
+- **Spamhaus API Integration**
+  - Automatic detection and reporting of phishing email source IPs
+  - Configurable Spamhaus API authentication and endpoints
+  - Threat intelligence sharing for spam-flagged emails
+  - Added `Spamhaus_report`, `Spamhaus_api_token`, and `Spamhaus_api_url` configuration options
+  - Added `Spamhaus_safe_address` for IP whitelist configuration
+  - Supports CIDR notation for network range exclusions
+
+- **Dependency Optimization**
+  - Removed `lazy_static` dependency (unused)
+  - Replaced `once_cell` with standard library `std::sync::OnceLock`
+  - Reduced external dependencies and improved compilation time
+  - Updated to latest compatible versions of all dependencies
+
+- **Code Quality Improvements**
+  - Comprehensive code documentation and comments
+  - Improved error handling in regex matching
+  - Enhanced code readability and maintainability
+  - Applied consistent formatting with `cargo fmt`
+  - Resolved all `cargo clippy` warnings
+
+- **Configuration System Enhancements**
+  - Better error messages for invalid filter configurations
+  - Improved regex compilation error reporting
+  - Enhanced configuration file parsing robustness
 
 ### v0.1.0
 - Initial release

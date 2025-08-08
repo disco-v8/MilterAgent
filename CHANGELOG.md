@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-08-08
+
+### Added
+- **Rust 2024 Edition Support**: Upgraded from Rust 2021 to 2024 edition for improved performance and latest language features
+- **Advanced Regex Engine**: Migrated to `fancy-regex` 0.16 with support for:
+  - Negative lookahead (`(?!...)`) and positive lookahead (`(?=...`)
+  - Negative lookbehind (`(?<!...)`) and positive lookbehind (`(?<=...`)
+  - Sophisticated phishing detection patterns
+- **Spamhaus API Integration**: 
+  - Automatic detection and reporting of phishing email source IPs
+  - Configurable API authentication (`Spamhaus_api_token`)
+  - Configurable API endpoint (`Spamhaus_api_url`)
+  - Enable/disable reporting (`Spamhaus_report`)
+  - Threat intelligence sharing for flagged emails
+- Enhanced filter examples demonstrating negative lookahead patterns
+- Comprehensive code documentation and comments
+- Better error messages for invalid filter configurations
+
+### Changed
+- **Dependency Optimization**: 
+  - Replaced `once_cell` with standard library `std::sync::OnceLock`
+  - Removed unused `lazy_static` dependency
+  - Updated all dependencies to latest compatible versions
+- **Code Quality Improvements**:
+  - Applied consistent formatting with `cargo fmt`
+  - Resolved all `cargo clippy` warnings
+  - Enhanced error handling in regex matching
+  - Improved code readability and maintainability
+- **Configuration System**: Enhanced regex compilation error reporting and configuration file parsing robustness
+
+### Deprecated
+- Support for Rust versions below 1.80 (required for Rust 2024 edition)
+
+### Removed
+- `lazy_static` dependency (unused)
+- `once_cell` dependency (replaced with standard library)
+
 ### Added
 - Enhanced phishing detection filters for major Japanese organizations:
   - Banking and financial services (MUFG, Mizuho, SMBC, etc.)
