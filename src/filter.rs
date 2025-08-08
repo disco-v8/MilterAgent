@@ -5,7 +5,7 @@
 // 【このファイルで使う主なクレート】
 // - std::collections::HashMap: メール内容のキー・バリュー格納（header_from, decode_text等）
 // - crate::init::CONFIG: グローバル設定（フィルター条件、正規表現等）
-// - regex: 正規表現マッチング判定（mail-parserで抽出したメール内容とのパターンマッチ）
+// - fancy-regex: 高機能正規表現マッチング判定（負先読み・後読み対応、メール内容パターンマッチ）
 //
 // 【役割】
 // - mail-parserで抽出されたメール内容（差出人、件名、本文等）とフィルター設定の照合
@@ -148,8 +148,8 @@ fn process_single_filter(
         // メール内容から対象キーの値を取得
         let value = mail_values.get(&rule.key).map(|s| s.as_str()).unwrap_or("");
 
-        // 正規表現でパターンマッチング実行
-        let is_match = rule.regex.is_match(value);
+        // 正規表現でパターンマッチング実行（fancy-regexはResult型を返す）
+        let is_match = rule.regex.is_match(value).unwrap_or(false);
 
         // negate指定がある場合は結果を反転
         let ok = if rule.negate { !is_match } else { is_match };

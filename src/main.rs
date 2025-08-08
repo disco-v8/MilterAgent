@@ -21,12 +21,13 @@ mod logging; // JSTタイムスタンプ付きログ出力
 mod milter; // Milterコマンドごとのデコード・応答処理
 mod milter_command; // Milterコマンド定義
 mod parse; // メールパース・出力処理 // フィルター判定ロジック
+mod spamhaus; // Spamhausレポート処理
 
 use init::load_config;
 use std::env;
 use std::sync::{Arc, RwLock}; // スレッド安全な参照カウント・ロック
 #[cfg(unix)]
-use tokio::signal::unix::{signal, SignalKind}; // Unix系: シグナル受信
+use tokio::signal::unix::{SignalKind, signal}; // Unix系: シグナル受信
 use tokio::{net::TcpListener, sync::broadcast};
 
 use crate::init::LOG_INFO; // 非同期TCPサーバ・ブロードキャスト // 設定ファイル読込

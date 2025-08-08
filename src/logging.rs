@@ -4,7 +4,7 @@
 //
 // 【このファイルで使う主なクレート】
 // - std::sync::{Arc, RwLock}: スレッド間でのグローバル設定共有（読み書きロック付き）
-// - once_cell::sync::OnceCell: スレッドセーフな一度だけ初期化される静的変数
+// - std::sync::OnceLock: スレッドセーフな一度だけ初期化される静的変数（Rust標準ライブラリ）
 // - chrono: 日時操作・整形（Local::now, format）
 // - chrono-tz: タイムゾーン変換（Asia::Tokyo/JST指定）
 // - std::fs::OpenOptions: ログファイルの作成・追記モード操作
@@ -16,11 +16,10 @@
 // =========================
 
 use crate::init::Config;
-use once_cell::sync::OnceCell;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
 // グローバル設定を格納する静的変数（一度だけ初期化、スレッドセーフ）
-static GLOBAL_CONFIG: OnceCell<Arc<RwLock<Config>>> = OnceCell::new();
+static GLOBAL_CONFIG: OnceLock<Arc<RwLock<Config>>> = OnceLock::new();
 
 /// グローバルConfigをセット（アプリケーション起動時に一度だけ呼び出し）
 ///

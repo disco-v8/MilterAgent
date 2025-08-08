@@ -342,7 +342,11 @@ pub fn parse_mail(
                 crate::printdaytimeln!(
                     LOG_TRACE,
                     "[parser] 非テキストパート({}): content_type={}, encoding={}, filename={}, size={} bytes",
-                    non_text_idx + 1, ct, encoding_str, fname, size
+                    non_text_idx + 1,
+                    ct,
+                    encoding_str,
+                    fname,
+                    size
                 ); // 非テキストパート情報出力
                 non_text_idx += 1; // インデックスを次へ
             }

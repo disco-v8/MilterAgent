@@ -526,7 +526,7 @@ pub async fn send_milter_response(
     let mut resp = Vec::with_capacity(5); // 応答バッファ（5バイト: サイズ4+コマンド1）
     resp.extend_from_slice(&resp_size.to_be_bytes()); // サイズ（4バイト）
     resp.push(resp_cmd); // コマンド（1バイト）
-                         // クライアントに応答を送信（非同期）
+    // クライアントに応答を送信（非同期）
     if let Err(e) = stream.write_all(&resp).await {
         crate::printdaytimeln!(LOG_DEBUG, "[response] 応答送信エラー: {}: {}", peer_addr, e);
     // 送信失敗時はエラーログ
