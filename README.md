@@ -214,6 +214,28 @@ filter[phish_monex_html] =
 
 This filter detects emails containing "monex" but not from legitimate Monex domains, preventing phishing attempts that impersonate the financial service while allowing legitimate communications.
 
+### Caveat: Negative Lookahead Recursion Depth in `fancy-regex`
+
+When using `fancy-regex` for semantic filtering, be aware that negative lookaheads `(?!...)` containing more than 3–4 `|` branches may exceed internal recursion depth.
+
+This can result in partial matches or incorrect evaluation, especially when filtering URLs with multiple domain exclusions.
+
+**Recommended workaround:**
+- Split complex lookaheads into multiple filter rules
+- Avoid deeply nested alternations inside `(?!...)`
+- Use simpler patterns with fewer branches per lookahead
+
+Example:
+
+```dsl
+# Avoid this (may fail):
+decode_html:https?://(?!.*\.(a\.com|b\.com|c\.com|d\.com|e\.com)\b).+:REJECT
+
+# Prefer this (stable evaluation):
+decode_html:https?://(?!.*\.(a\.com|b\.com|c\.com)\b).+:AND
+decode_html:https?://(?!.*\.(d\.com|e\.com)\b).+:REJECT
+```
+
 ## Contributing
 
 1. Fork the repository
@@ -337,6 +359,12 @@ For issues, questions, or contributions, please open an issue on GitHub.
   - Added `Spamhaus_report`, `Spamhaus_api_token`, and `Spamhaus_api_url` configuration options
   - Added `Spamhaus_safe_address` for IP whitelist configuration
   - Supports CIDR notation for network range exclusions
+
+- **Filter Engine Improvements**
+  - Fixed fancy-regex recursion depth issue with complex negative lookaheads
+  - Split complex OR patterns to avoid recursion limits (>3-4 branches)
+  - Improved semantic accuracy for w3.org and domain exclusion filters
+  - Enhanced filter reliability and pattern matching stability
 
 - **Dependency Optimization**
   - Removed `lazy_static` dependency (unused)
