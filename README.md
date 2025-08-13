@@ -255,7 +255,6 @@ This software is designed to help protect against phishing emails but should be 
 ## Support
 
 For issues, questions, or contributions, please use the GitHub issue tracker.
-```
 
 ### Multi-part Email with Attachments
 
@@ -339,6 +338,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For issues, questions, or contributions, please open an issue on GitHub.
 
 ## Changelog
+
+### v0.2.1 (2025-08-13)
+- Refactored filter rule parsing logic for more robust and flexible configuration
+- Improved handling of colons (:) in filter rules, especially for URLs—no escaping required
 
 ### v0.2.0 (2025-08-08)
 - **Major Update: Rust 2024 Edition Support**

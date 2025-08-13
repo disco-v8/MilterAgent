@@ -25,7 +25,6 @@ pub struct FilterRule {
     pub key: String,    // フィルター対象フィールド（decode_from, decode_subject, body等）
     pub regex: Regex,   // マッチング用正規表現パターン
     pub negate: bool,   // 否定条件フラグ（!で指定時はtrue）
-    pub logic: String,  // 複数条件の論理演算子（AND/OR）
     pub action: String, // マッチ時の実行アクション（REJECT/DROP/WARN/ACCEPT）
 }
 
@@ -377,49 +376,45 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
 
                     // 各判定条件を個別にパース
                     for rule in rule_list {
-                        let parts: Vec<&str> = rule.split(':').collect();
+                        // ルール定義文字列を「:」(ただしエスケープ除外)で分割する正規表現を生成
+                        let re = Regex::new(r"(?<!\\):").unwrap();
+                        // 分割結果（parts）は [キー, パターン, アクション] の3要素になる想定
+                        let parts: Vec<&str> = re.split(rule).filter_map(Result::ok).collect();
+                        // デバッグ出力: フィルター定義全文と各パーツ
+                        crate::printdaytimeln!(
+                            LOG_DEBUG,
+                            "[init] filter name='{}' rule raw='{}' parts0='{}' parts1='{}' parts2='{}'",
+                            name,
+                            rule,
+                            parts.first().unwrap_or(&""),
+                            parts.get(1).unwrap_or(&""),
+                            parts.get(2).unwrap_or(&"")
+                        );
 
-                        // 3要素形式: キー:パターン:アクション（論理演算子なし）
+                        // 3要素形式: 「キー:パターン:アクション」のみ対応
                         if parts.len() == 3 {
-                            let key = parts[0].trim().trim_matches('"'); // 対象フィールド名
-                            let (negate, pattern_raw) = if parts[1].starts_with('!') {
-                                (true, &parts[1][1..]) // 否定条件フラグ付き
-                            } else {
-                                (false, parts[1]) // 通常の肯定条件
-                            };
-                            let pattern = pattern_raw.trim().trim_matches('"').replace('\x00', ":"); // 正規表現（:復元）
-
-                            // 正規表現のコンパイル試行
-                            if let Ok(regex) = Regex::new(&pattern) {
-                                let action = parts[2].trim().trim_matches('"').replace('\x00', ":"); // 実行アクション
-                                rules.push(FilterRule {
-                                    key: key.to_string(),
-                                    regex,
-                                    negate,
-                                    logic: "".to_string(), // 論理演算子なし
-                                    action: action.to_string(),
-                                });
-                            }
-                        }
-                        // 4要素以上形式: キー:パターン:論理演算子:アクション
-                        else if parts.len() >= 4 {
+                            // parts[0]: フィルター対象フィールド名（例: body, subject, from等）
                             let key = parts[0].trim().trim_matches('"');
+                            // parts[1]: パターン（先頭が!なら否定条件）
                             let (negate, pattern_raw) = if parts[1].starts_with('!') {
+                                // 先頭!なら否定条件フラグをtrue、!を除去したパターン文字列
                                 (true, &parts[1][1..])
                             } else {
+                                // 否定条件でなければ通常のパターン
                                 (false, parts[1])
                             };
-                            let pattern = pattern_raw.trim().trim_matches('"').replace('\x00', ":");
-
-                            if let Ok(regex) = Regex::new(&pattern) {
-                                let logic = parts[2].trim().trim_matches('"').replace('\x00', ":"); // AND/OR演算子
-                                let action = parts[3].trim().trim_matches('"').replace('\x00', ":"); // 実行アクション
+                            // パターン文字列の前後の"を除去
+                            let pattern = pattern_raw.trim().trim_matches('"');
+                            // 正規表現パターンをコンパイル（失敗時は無視）
+                            if let Ok(regex) = Regex::new(pattern) {
+                                // parts[2]: 実行アクション（REJECT/DROP/WARN/ACCEPT等）
+                                let action = parts[2].trim().trim_matches('"');
+                                // フィルタールール構造体に追加
                                 rules.push(FilterRule {
-                                    key: key.to_string(),
-                                    regex,
-                                    negate,
-                                    logic: logic.to_string(),
-                                    action: action.to_string(),
+                                    key: key.to_string(), // フィルター対象フィールド名（例: body, subject, from等）
+                                    regex,                // マッチング用正規表現パターン
+                                    negate,               // 否定条件フラグ（!で指定時はtrue）
+                                    action: action.to_string(), // マッチ時の実行アクション（REJECT/DROP/WARN/ACCEPT/AND/OR等）
                                 });
                             }
                         }
@@ -487,12 +482,11 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
         for (i, rule) in rules.iter().enumerate() {
             crate::printdaytimeln!(
                 LOG_DEBUG,
-                "  [{}] key='{}' pattern='{}' negate={} logic='{}' action='{}'",
+                "  [{}] key='{}' pattern='{}' negate={} action='{}'",
                 i,
                 rule.key,
                 rule.regex.as_str(),
                 rule.negate,
-                rule.logic,
                 rule.action
             );
         }
