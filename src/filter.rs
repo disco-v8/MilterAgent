@@ -19,6 +19,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use crate::init::Config;
+use crate::init::LOG_DEBUG;
 
 /// フィルター判定関数（並列処理版）
 /// - mail_values: キーごとの値（header_～, decode_～など）
@@ -148,11 +149,26 @@ fn process_single_filter(
         // メール内容から対象キーの値を取得
         let value = mail_values.get(&rule.key).map(|s| s.as_str()).unwrap_or("");
 
-        // 正規表現でパターンマッチング実行（fancy-regexはResult型を返す）
-        let is_match = rule.regex.is_match(value).unwrap_or(false);
+        // 正規表現でパターンマッチング実行（どの部分が一致したかも取得）
+        let captures = rule.regex.captures(value).unwrap_or(None);
+        let is_match = captures.is_some();
+        let matched_str = captures
+            .and_then(|caps| caps.get(0).map(|m| m.as_str()))
+            .unwrap_or("");
 
         // negate指定がある場合は結果を反転
         let ok = if rule.negate { !is_match } else { is_match };
+
+        // マッチした場合は一致した文字列をログ出力
+        if is_match {
+            crate::printdaytimeln!(
+                LOG_DEBUG,
+                "[filter] key='{}' pattern='{}' matched='{}'",
+                rule.key,
+                rule.regex.as_str(),
+                matched_str
+            );
+        }
 
         // アクション種別を大文字化
         let action_upper = rule.action.to_ascii_uppercase();

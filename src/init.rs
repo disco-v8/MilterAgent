@@ -377,9 +377,7 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
 
                     // 各判定条件を個別にパース
                     for rule in rule_list {
-                        // エスケープされた:文字を一時的に特殊文字に置換してから分割
-                        let rule_escaped = rule.replace("\\:", "\x00");
-                        let parts: Vec<&str> = rule_escaped.split(':').collect();
+                        let parts: Vec<&str> = rule.split(':').collect();
 
                         // 3要素形式: キー:パターン:アクション（論理演算子なし）
                         if parts.len() == 3 {
