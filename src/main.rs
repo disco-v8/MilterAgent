@@ -115,6 +115,14 @@ async fn main() {
         // サーバー再起動ループ
         let current_config = config.read().unwrap().clone(); // 現在の設定取得
         printdaytimeln!(LOG_INFO, "[main] 設定読込: {}", current_config.address); // バインドアドレス表示
+        let log_level_str = match current_config.log_level {
+            0 => "info",
+            2 => "trace",
+            8 => "debug",
+            n => &format!("unknown({})", n),
+        };
+        printdaytimeln!(LOG_INFO, "[main] Log_level: {}", log_level_str); // ログレベル表示
+
         let bind_result = TcpListener::bind(&current_config.address).await; // TCPバインド
         let listener = match bind_result {
             Ok(listener) => {
