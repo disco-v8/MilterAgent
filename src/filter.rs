@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::init::Config;
 use crate::init::LOG_DEBUG;
@@ -42,6 +43,12 @@ pub fn filter_check(
     _mail_values: &HashMap<String, String>,
     config: &Config,
 ) -> Option<(String, String)> {
+    // _mail_valuesの値をNFKC正規化したHashMapを作成
+    let normalized_mail_values: HashMap<String, String> = _mail_values
+        .iter()
+        .map(|(k, v)| (k.clone(), v.nfkc().collect()))
+        .collect();
+
     // フィルター設定をベクタに変換（所有権付きで並列処理用）
     let filters: Vec<(String, Vec<crate::init::FilterRule>)> = config
         .filters
@@ -78,7 +85,7 @@ pub fn filter_check(
         let chunk_filters = chunk_filters.to_vec();
         let should_stop = Arc::clone(&should_stop);
         let result = Arc::clone(&result);
-        let mail_values = _mail_values.clone();
+        let mail_values = normalized_mail_values.clone();
 
         let handle = thread::spawn(move || {
             // チャンク内の各フィルターを順次処理
