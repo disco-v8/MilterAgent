@@ -19,8 +19,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use unicode_normalization::UnicodeNormalization;
 
-use crate::init::Config;
 use crate::init::LOG_DEBUG;
+use crate::init::{Config, LOG_TRACE};
 
 /// フィルター判定関数（並列処理版）
 /// - mail_values: キーごとの値（header_～, decode_～など）
@@ -169,11 +169,20 @@ fn process_single_filter(
         // マッチした場合は一致した文字列をログ出力
         if is_match {
             crate::printdaytimeln!(
-                LOG_DEBUG,
+                LOG_TRACE,
                 "[filter] key='{}' pattern='{}' matched='{}'",
                 rule.key,
                 rule.regex.as_str(),
                 matched_str
+            );
+        } else {
+            // マッチしなかった場合はDEBUGで値を出力
+            crate::printdaytimeln!(
+                LOG_DEBUG,
+                "[filter] key='{}' pattern='{}' not_matched='{}'",
+                rule.key,
+                rule.regex.as_str(),
+                value
             );
         }
 
