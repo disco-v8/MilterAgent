@@ -6,6 +6,7 @@
 // - std::collections::HashMap: メール内容のキー・バリュー格納（header_from, decode_text等）
 // - crate::init::CONFIG: グローバル設定（フィルター条件、正規表現等）
 // - fancy-regex: 高機能正規表現マッチング判定（負先読み・後読み対応、メール内容パターンマッチ）
+// - unicode-normalization: 文字列のUnicode正規化（NFKC変換、BOMや制御文字除去など）
 //
 // 【役割】
 // - mail-parserで抽出されたメール内容（差出人、件名、本文等）とフィルター設定の照合
@@ -137,12 +138,22 @@ pub fn filter_check(
     }
 }
 
+/// 文字列をNFKC正規化し、不要な制御文字や結合文字を除去する
+/// - NFKC: 全角/半角・合成文字などを正規化
+/// - BOMやゼロ幅スペース、双方向制御文字、結合記号などを除去
+/// - 最後に空白を除去して連結
 fn normalize_mail_value(s: &str) -> String {
+    // 1. NFKC正規化（全角/半角・合成文字などを統一）
     let nfkc = s.nfkc().collect::<String>();
+
+    // 2. 不要な制御文字・結合文字を除去
     let cleaned: String = nfkc
         .chars()
         .filter(|c| {
             let code = *c as u32;
+            // BOM（U+FEFF）を除去
+            // ゼロ幅スペース・双方向制御文字（U+200B～U+200F, U+202A～U+202E, U+2060～U+206F）を除去
+            // 結合記号（U+0300～U+036F）を除去
             !(code == 0xFEFF || // BOM
               (0x200B..=0x200F).contains(&code) || // ZWSP, ZWNJ, ZWJ, LRM, RLM
               (0x202A..=0x202E).contains(&code) || // Bidi controls
@@ -151,7 +162,7 @@ fn normalize_mail_value(s: &str) -> String {
         })
         .collect();
 
-    // 最後に、スペースで分割して再構成
+    // 3. 空白（スペース・改行等）で分割し、すべて連結（余計な空白を除去）
     cleaned.split_whitespace().collect::<String>()
 }
 
