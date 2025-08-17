@@ -189,12 +189,20 @@ fn process_single_filter(
         // メール内容から対象キーの値を取得
         let value = mail_values.get(&rule.key).map(|s| s.as_str()).unwrap_or("");
 
-        // 正規表現でパターンマッチング実行（どの部分が一致したかも取得）
-        let captures = rule.regex.captures(value).unwrap_or(None);
-        let is_match = captures.is_some();
-        let matched_str = captures
-            .and_then(|caps| caps.get(0).map(|m| m.as_str()))
-            .unwrap_or("");
+        // 正規表現で部分一致判定（is_match）
+        let is_match = rule.regex.is_match(value).unwrap_or(false);
+        // 一致した場合は最初の一致部分を取得（部分一致）
+        let matched_str = if is_match {
+            // captures_iterで最初の一致部分を取得
+            rule.regex
+                .captures_iter(value)
+                .next()
+                .and_then(|res| res.ok())
+                .and_then(|caps| caps.get(0).map(|m| m.as_str()))
+                .unwrap_or("")
+        } else {
+            ""
+        };
 
         // negate指定がある場合は結果を反転
         let ok = if rule.negate { !is_match } else { is_match };
