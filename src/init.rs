@@ -173,69 +173,6 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-            // include ディレクトリの再帰読み込み処理
-            else if line.starts_with("include") {
-                crate::printdaytimeln!(LOG_DEBUG, "[init] processing include line: {}", line);
-                if let Some((_, dir_path)) = split_key_value(line) {
-                    // 複数行のinclude設定値を収集
-                    let full_value = collect_multiline_value(&mut lines, dir_path, true);
-                    crate::printdaytimeln!(
-                        LOG_DEBUG,
-                        "[init] include directories: '{}'",
-                        full_value
-                    );
-
-                    // カンマ区切りで複数のディレクトリを処理
-                    for dir in full_value.split(',') {
-                        let dir = dir.trim();
-                        crate::printdaytimeln!(
-                            LOG_DEBUG,
-                            "[init] trying to read directory: '{}'",
-                            dir
-                        );
-                        if !dir.is_empty() {
-                            if let Ok(entries) = std::fs::read_dir(dir) {
-                                for entry in entries.flatten() {
-                                    let path = entry.path();
-                                    if path.is_file() {
-                                        if let Some(ext) = path.extension() {
-                                            if ext == "conf" {
-                                                crate::printdaytimeln!(
-                                                    LOG_INFO,
-                                                    "[init] loading sub-conf file: {}",
-                                                    path.display()
-                                                );
-                                                if let Ok(sub_text) = std::fs::read_to_string(&path)
-                                                {
-                                                    crate::printdaytimeln!(
-                                                        LOG_DEBUG,
-                                                        "[init] file content length: {} bytes",
-                                                        sub_text.len()
-                                                    );
-                                                    parse_config_text(&sub_text, values);
-                                                } else {
-                                                    crate::printdaytimeln!(
-                                                        LOG_INFO,
-                                                        "[init] failed to read file: {}",
-                                                        path.display()
-                                                    );
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                crate::printdaytimeln!(
-                                    LOG_INFO,
-                                    "[init] failed to read directory: '{}'",
-                                    dir
-                                );
-                            }
-                        }
-                    }
-                }
-                continue;
-            }
             // Listen設定 - Milterサーバーの待受ソケット設定
             else if line.starts_with("Listen") {
                 if let Some((_, addr)) = split_key_value(line) {
@@ -439,6 +376,69 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                             "[init] filter[{}] の最終アクションがREJECT/DROP/WARN/ACCEPT以外、または未指定のため無効化",
                             name
                         );
+                    }
+                }
+                continue;
+            }
+            // include ディレクトリの再帰読み込み処理
+            else if line.starts_with("include") {
+                crate::printdaytimeln!(LOG_DEBUG, "[init] processing include line: {}", line);
+                if let Some((_, dir_path)) = split_key_value(line) {
+                    // 複数行のinclude設定値を収集
+                    let full_value = collect_multiline_value(&mut lines, dir_path, true);
+                    crate::printdaytimeln!(
+                        LOG_DEBUG,
+                        "[init] include directories: '{}'",
+                        full_value
+                    );
+
+                    // カンマ区切りで複数のディレクトリを処理
+                    for dir in full_value.split(',') {
+                        let dir = dir.trim();
+                        crate::printdaytimeln!(
+                            LOG_DEBUG,
+                            "[init] trying to read directory: '{}'",
+                            dir
+                        );
+                        if !dir.is_empty() {
+                            if let Ok(entries) = std::fs::read_dir(dir) {
+                                for entry in entries.flatten() {
+                                    let path = entry.path();
+                                    if path.is_file() {
+                                        if let Some(ext) = path.extension() {
+                                            if ext == "conf" {
+                                                crate::printdaytimeln!(
+                                                    LOG_INFO,
+                                                    "[init] loading sub-conf file: {}",
+                                                    path.display()
+                                                );
+                                                if let Ok(sub_text) = std::fs::read_to_string(&path)
+                                                {
+                                                    crate::printdaytimeln!(
+                                                        LOG_DEBUG,
+                                                        "[init] file content length: {} bytes",
+                                                        sub_text.len()
+                                                    );
+                                                    parse_config_text(&sub_text, values);
+                                                } else {
+                                                    crate::printdaytimeln!(
+                                                        LOG_INFO,
+                                                        "[init] failed to read file: {}",
+                                                        path.display()
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                crate::printdaytimeln!(
+                                    LOG_INFO,
+                                    "[init] failed to read directory: '{}'",
+                                    dir
+                                );
+                            }
+                        }
                     }
                 }
                 continue;
