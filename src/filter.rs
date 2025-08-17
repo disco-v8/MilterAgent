@@ -137,11 +137,10 @@ pub fn filter_check(
     }
 }
 
-fn normalize_mail_value(v: &str) -> String {
-    //    use unicode_normalization::UnicodeNormalization;
-
-    let nfkc = v.nfkc().collect::<String>();
-    nfkc.chars()
+fn normalize_mail_value(s: &str) -> String {
+    let nfkc = s.nfkc().collect::<String>();
+    let cleaned: String = nfkc
+        .chars()
         .filter(|c| {
             let code = *c as u32;
             !(code == 0xFEFF || // BOM
@@ -150,7 +149,10 @@ fn normalize_mail_value(v: &str) -> String {
               (0x2060..=0x206F).contains(&code) || // Word Joiner etc.
               (0x0300..=0x036F).contains(&code)) // Combining diacritics
         })
-        .collect()
+        .collect();
+
+    // 最後に、スペースで分割して再構成
+    cleaned.split_whitespace().collect::<String>()
 }
 
 /// 単一フィルターの処理（既存ロジックをヘルパー関数化）
