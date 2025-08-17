@@ -100,8 +100,9 @@ pub fn filter_check(
                     continue;
                 }
 
-                // 個別フィルターの処理（既存のロジックと同じ）
-                let filter_result = process_single_filter(&mail_values, &rules, &should_stop);
+                // 個別フィルターの処理（フィルター名も渡す）
+                let filter_result =
+                    process_single_filter(&mail_values, &rules, &should_stop, &logname);
 
                 // NONE以外の結果が出た場合
                 if filter_result != "NONE" {
@@ -167,10 +168,13 @@ fn normalize_mail_value(s: &str) -> String {
 }
 
 /// 単一フィルターの処理（既存ロジックをヘルパー関数化）
+/// 単一フィルターの処理（既存ロジックをヘルパー関数化）
+/// name: フィルター名（filter[xxx]のxxx部分）
 fn process_single_filter(
     mail_values: &HashMap<String, String>,
     rules: &[crate::init::FilterRule],
     should_stop: &Arc<AtomicBool>,
+    name: &str,
 ) -> String {
     let mut idx = 0;
 
@@ -195,20 +199,22 @@ fn process_single_filter(
         // negate指定がある場合は結果を反転
         let ok = if rule.negate { !is_match } else { is_match };
 
-        // マッチした場合は一致した文字列をログ出力
+        // マッチした場合は一致した文字列をログ出力（フィルター名も出力）
         if is_match {
             crate::printdaytimeln!(
                 LOG_TRACE,
-                "[filter] key='{}' pattern='{}' matched='{}'",
+                "[filter] name='{}' key='{}' pattern='{}' matched='{}'",
+                name,
                 rule.key,
                 rule.regex.as_str(),
                 matched_str
             );
         } else {
-            // マッチしなかった場合はDEBUGで値を出力
+            // マッチしなかった場合はDEBUGで値を出力（フィルター名も出力）
             crate::printdaytimeln!(
                 LOG_DEBUG,
-                "[filter] key='{}' pattern='{}' not_matched='{}'",
+                "[filter] name='{}' key='{}' pattern='{}' not_matched='{}'",
+                name,
                 rule.key,
                 rule.regex.as_str(),
                 value
