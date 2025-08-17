@@ -339,6 +339,11 @@ For issues, questions, or contributions, please open an issue on GitHub.
 
 ## Changelog
 
+## v0.3.0 - Semantic Filtering Reinforced
+- Added Unicode normalization (NFKC) and invisible character stripping to Subject/From headers
+- Improved spoofing resistance against obfuscated Unicode and bidirectional control characters
+- Enhanced semantic matching accuracy and operational reproducibility
+
 ### v0.2.1 (2025-08-13)
 - Refactored filter rule parsing logic for more robust and flexible configuration
 - Improved handling of colons (:) in filter rules, especially for URLs—no escaping required
