@@ -46,7 +46,7 @@ pub fn filter_check(
     // _mail_valuesの値をNFKC正規化したHashMapを作成
     let normalized_mail_values: HashMap<String, String> = _mail_values
         .iter()
-        .map(|(k, v)| (k.clone(), v.nfkc().collect()))
+        .map(|(k, v)| (k.clone(), normalize_mail_value(v)))
         .collect();
 
     // フィルター設定をベクタに変換（所有権付きで並列処理用）
@@ -135,6 +135,22 @@ pub fn filter_check(
         Some((action, logname)) => Some((action.clone(), logname.clone())),
         None => Some(("NONE".to_string(), "none".to_string())),
     }
+}
+
+fn normalize_mail_value(v: &str) -> String {
+    //    use unicode_normalization::UnicodeNormalization;
+
+    let nfkc = v.nfkc().collect::<String>();
+    nfkc.chars()
+        .filter(|c| {
+            let code = *c as u32;
+            !(code == 0xFEFF || // BOM
+              (0x200B..=0x200F).contains(&code) || // ZWSP, ZWNJ, ZWJ, LRM, RLM
+              (0x202A..=0x202E).contains(&code) || // Bidi controls
+              (0x2060..=0x206F).contains(&code) || // Word Joiner etc.
+              (0x0300..=0x036F).contains(&code)) // Combining diacritics
+        })
+        .collect()
 }
 
 /// 単一フィルターの処理（既存ロジックをヘルパー関数化）
