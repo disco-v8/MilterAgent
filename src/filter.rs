@@ -189,17 +189,33 @@ fn process_single_filter(
         // メール内容から対象キーの値を取得
         let value = mail_values.get(&rule.key).map(|s| s.as_str()).unwrap_or("");
 
-        // decode_text, decode_htmlの場合は改行ごとに分割して判定
-        let (is_match, matched_str) = if rule.key == "decode_text" || rule.key == "decode_html" {
+        // decode_textは改行ごと、decode_htmlは「<」ごとに分割して判定
+        let (is_match, matched_str) = if rule.key == "decode_text" {
             let mut found = false;
             let mut matched = "";
             for line in value.lines() {
                 if rule.regex.is_match(line).unwrap_or(false) {
                     found = true;
-                    // 最初に一致した部分文字列を取得
                     matched = rule
                         .regex
                         .captures_iter(line)
+                        .next()
+                        .and_then(|res| res.ok())
+                        .and_then(|caps| caps.get(0).map(|m| m.as_str()))
+                        .unwrap_or("");
+                    break;
+                }
+            }
+            (found, matched)
+        } else if rule.key == "decode_html" {
+            let mut found = false;
+            let mut matched = "";
+            for chunk in value.split('<') {
+                if rule.regex.is_match(chunk).unwrap_or(false) {
+                    found = true;
+                    matched = rule
+                        .regex
+                        .captures_iter(chunk)
                         .next()
                         .and_then(|res| res.ok())
                         .and_then(|caps| caps.get(0).map(|m| m.as_str()))
