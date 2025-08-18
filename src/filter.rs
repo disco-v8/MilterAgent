@@ -152,14 +152,18 @@ fn normalize_mail_value(s: &str) -> String {
         .chars()
         .filter(|c| {
             let code = *c as u32;
-            // BOM（U+FEFF）を除去
-            // ゼロ幅スペース・双方向制御文字（U+200B～U+200F, U+202A～U+202E, U+2060～U+206F）を除去
-            // 結合記号（U+0300～U+036F）を除去
             !(code == 0xFEFF || // BOM
+              (0x0000..=0x001F).contains(&code) || // C0 controls
+              code == 0x007F || // DEL
               (0x200B..=0x200F).contains(&code) || // ZWSP, ZWNJ, ZWJ, LRM, RLM
               (0x202A..=0x202E).contains(&code) || // Bidi controls
               (0x2060..=0x206F).contains(&code) || // Word Joiner etc.
-              (0x0300..=0x036F).contains(&code)) // Combining diacritics
+              (0x0300..=0x036F).contains(&code) || // Combining diacritics
+              (0x2000..=0x200A).contains(&code) || // Invisible spaces
+              code == 0x202F || // Narrow NBSP
+              code == 0x00A0 || // NBSP
+              (0xFE00..=0xFE0F).contains(&code) || // Variation Selectors
+              code == 0x180E) // Mongolian Vowel Separator
         })
         .collect();
 
