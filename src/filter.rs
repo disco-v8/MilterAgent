@@ -189,19 +189,39 @@ fn process_single_filter(
         // メール内容から対象キーの値を取得
         let value = mail_values.get(&rule.key).map(|s| s.as_str()).unwrap_or("");
 
-        // 正規表現で部分一致判定（is_match）
-        let is_match = rule.regex.is_match(value).unwrap_or(false);
-        // 一致した場合は最初の一致部分を取得（部分一致）
-        let matched_str = if is_match {
-            // captures_iterで最初の一致部分を取得
-            rule.regex
-                .captures_iter(value)
-                .next()
-                .and_then(|res| res.ok())
-                .and_then(|caps| caps.get(0).map(|m| m.as_str()))
-                .unwrap_or("")
+        // decode_text, decode_htmlの場合は改行ごとに分割して判定
+        let (is_match, matched_str) = if rule.key == "decode_text" || rule.key == "decode_html" {
+            let mut found = false;
+            let mut matched = "";
+            for line in value.lines() {
+                if rule.regex.is_match(line).unwrap_or(false) {
+                    found = true;
+                    // 最初に一致した部分文字列を取得
+                    matched = rule
+                        .regex
+                        .captures_iter(line)
+                        .next()
+                        .and_then(|res| res.ok())
+                        .and_then(|caps| caps.get(0).map(|m| m.as_str()))
+                        .unwrap_or("");
+                    break;
+                }
+            }
+            (found, matched)
         } else {
-            ""
+            // それ以外は従来通り全体で判定
+            let is_match = rule.regex.is_match(value).unwrap_or(false);
+            let matched_str = if is_match {
+                rule.regex
+                    .captures_iter(value)
+                    .next()
+                    .and_then(|res| res.ok())
+                    .and_then(|caps| caps.get(0).map(|m| m.as_str()))
+                    .unwrap_or("")
+            } else {
+                ""
+            };
+            (is_match, matched_str)
         };
 
         // negate指定がある場合は結果を反転
