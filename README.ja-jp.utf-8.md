@@ -244,8 +244,10 @@ decode_html:https?://(?!.*\.(d\.com|e\.com)\b).+:REJECT
 
 ## 変更履歴
 
-### v0.3.0（2025-08-17）Semantic Filtering Reinforced
+### v0.3.1（2025-08-20）Mitigation of recursion depth limitations
+- fancy-regex再帰深度問題を回避すべくdecode_textとdecode_htmlを細分化する処理に変更
 
+### v0.3.0（2025-08-17）Semantic Filtering Reinforced
 - Subject/Fromヘッダーに対してUnicode正規化（NFKC）と不可視文字の除去を追加  
 - Unicodeの難読化や双方向制御文字によるなりすまし耐性を強化  
 - 意味ベースのマッチ精度と運用再現性を向上  

@@ -339,6 +339,9 @@ For issues, questions, or contributions, please open an issue on GitHub.
 
 ## Changelog
 
+### v0.3.1（2025-08-20）Mitigation of recursion depth limitations
+- Modified processing to avoid recursion depth issues in fancy-regex.
+
 ## v0.3.0 - Semantic Filtering Reinforced (2025-08-17)
 - Added Unicode normalization (NFKC) and invisible character stripping to Subject/From headers
 - Improved spoofing resistance against obfuscated Unicode and bidirectional control characters
