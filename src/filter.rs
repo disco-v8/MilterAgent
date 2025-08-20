@@ -172,7 +172,6 @@ fn normalize_mail_value(s: &str) -> String {
 }
 
 /// 単一フィルターの処理（既存ロジックをヘルパー関数化）
-/// 単一フィルターの処理（既存ロジックをヘルパー関数化）
 /// name: フィルター名（filter[xxx]のxxx部分）
 fn process_single_filter(
     mail_values: &HashMap<String, String>,
@@ -193,13 +192,17 @@ fn process_single_filter(
         // メール内容から対象キーの値を取得
         let value = mail_values.get(&rule.key).map(|s| s.as_str()).unwrap_or("");
 
-        // decode_textは改行ごと、decode_htmlは「<」ごとに分割して判定
+        // 判定方法をキーごとに分岐
+        // decode_textは改行ごとに分割して判定
         let (is_match, matched_str) = if rule.key == "decode_text" {
-            let mut found = false;
-            let mut matched = "";
+            let mut found = false; // 一致フラグ
+            let mut matched = ""; // 一致した部分文字列
             for line in value.lines() {
+                // 1行ずつ処理
+                // 正規表現で部分一致判定
                 if rule.regex.is_match(line).unwrap_or(false) {
-                    found = true;
+                    found = true; // 一致したらフラグON
+                    // 最初に一致した部分文字列を取得
                     matched = rule
                         .regex
                         .captures_iter(line)
@@ -207,16 +210,21 @@ fn process_single_filter(
                         .and_then(|res| res.ok())
                         .and_then(|caps| caps.get(0).map(|m| m.as_str()))
                         .unwrap_or("");
-                    break;
+                    break; // 最初の一致で抜ける
                 }
             }
             (found, matched)
-        } else if rule.key == "decode_html" {
-            let mut found = false;
-            let mut matched = "";
-            for chunk in value.split('<') {
+        }
+        // decode_htmlは「>」ごとに分割して判定（HTMLタグ・属性単位）
+        else if rule.key == "decode_html" {
+            let mut found = false; // 一致フラグ
+            let mut matched = ""; // 一致した部分文字列
+            for chunk in value.split('>') {
+                // 「<」で分割して処理
+                // 正規表現で部分一致判定
                 if rule.regex.is_match(chunk).unwrap_or(false) {
-                    found = true;
+                    found = true; // 一致したらフラグON
+                    // 最初に一致した部分文字列を取得
                     matched = rule
                         .regex
                         .captures_iter(chunk)
@@ -224,13 +232,16 @@ fn process_single_filter(
                         .and_then(|res| res.ok())
                         .and_then(|caps| caps.get(0).map(|m| m.as_str()))
                         .unwrap_or("");
-                    break;
+                    break; // 最初の一致で抜ける
                 }
             }
             (found, matched)
-        } else {
-            // それ以外は従来通り全体で判定
+        }
+        // それ以外のキーは値全体で判定
+        else {
+            // 正規表現で部分一致判定（値全体）
             let is_match = rule.regex.is_match(value).unwrap_or(false);
+            // 一致した場合は最初の一致部分を取得
             let matched_str = if is_match {
                 rule.regex
                     .captures_iter(value)
