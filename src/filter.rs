@@ -219,8 +219,8 @@ fn process_single_filter(
         else if rule.key == "decode_html" {
             let mut found = false; // 一致フラグ
             let mut matched = ""; // 一致した部分文字列
-            for chunk in value.split('>') {
-                // 「<」で分割して処理
+            // 「>」または改行で分割して判定
+            for chunk in value.split(['>', '\n']) {
                 // 正規表現で部分一致判定
                 if rule.regex.is_match(chunk).unwrap_or(false) {
                     found = true; // 一致したらフラグON
