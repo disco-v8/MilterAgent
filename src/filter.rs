@@ -215,12 +215,12 @@ fn process_single_filter(
             }
             (found, matched)
         }
-        // decode_htmlは「>」ごとに分割して判定（HTMLタグ・属性単位）
+        // decode_htmlは「>」または改行ごとに分割して判定（HTMLタグ・属性単位）
         else if rule.key == "decode_html" {
             let mut found = false; // 一致フラグ
             let mut matched = ""; // 一致した部分文字列
             // 「>」または改行で分割して判定
-            for chunk in value.split(['>', '\n']) {
+            for chunk in value.split(['"', '>', '\n']) {
                 // 正規表現で部分一致判定
                 if rule.regex.is_match(chunk).unwrap_or(false) {
                     found = true; // 一致したらフラグON
