@@ -211,6 +211,16 @@ fn process_single_filter(
                         .and_then(|caps| caps.get(0).map(|m| m.as_str()))
                         .unwrap_or("");
                     break; // 最初の一致で抜ける
+                } else {
+                    // マッチしなかった場合はDEBUGで値を出力（フィルター名も出力）
+                    crate::printdaytimeln!(
+                        LOG_DEBUG,
+                        "[filter] name='{}' key='{}' pattern='{}' not_matched='{}'",
+                        name,
+                        rule.key,
+                        rule.regex.as_str(),
+                        value
+                    );
                 }
             }
             (found, matched)
