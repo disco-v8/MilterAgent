@@ -30,10 +30,6 @@ MilterAgent is a comprehensive email security solution that implements the Milte
 - **Cross-platform**: Supports both Unix and Windows environments
 - **Comprehensive Logging**: Configurable log levels with JST timestamp support
 
-## Installation
-
-### Prerequisites
-
 ## Architecture
 
 - **Asynchronous Runtime**: Built with Tokio for handling multiple concurrent connections
