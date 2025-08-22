@@ -244,6 +244,10 @@ decode_html:https?://(?!.*\.(d\.com|e\.com)\b).+:REJECT
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+**Notice:**
+- This project uses third-party crates, some of which are licensed under Apache-2.0.
+- In particular, the [mail-parser](https://crates.io/crates/mail-parser) crate is licensed under Apache-2.0. Please review its license if you redistribute or modify this software.
+
 ## Security Notice
 
 This software is designed to help protect against phishing emails but should be used as part of a comprehensive email security strategy. Regular updates to filter rules are recommended to address new phishing campaigns.
@@ -312,26 +316,6 @@ You can test the server by sending emails through a configured Postfix instance 
 - Hex dump output for unknown commands
 - Detailed protocol command logging
 - Error handling with descriptive messages
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-**Notice:**
-- This project uses third-party crates, some of which are licensed under Apache-2.0.
-- In particular, the [mail-parser](https://crates.io/crates/mail-parser) crate is licensed under Apache-2.0. Please review its license if you redistribute or modify this software.
-
-## Support
-
-For issues, questions, or contributions, please open an issue on GitHub.
 
 ## Changelog
 
