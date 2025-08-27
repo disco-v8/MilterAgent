@@ -53,10 +53,10 @@ async fn main() {
         }
     };
     while let Some(arg) = args.next() {
-        if arg == "-f" {
-            if let Some(path) = args.next() {
-                config_path = path;
-            }
+        if arg == "-f"
+            && let Some(path) = args.next()
+        {
+            config_path = path;
         }
     }
     let config_path = Arc::new(config_path);
@@ -148,7 +148,7 @@ async fn main() {
                     tokio::spawn(client::handle_client(stream, shutdown_rx, config)); // クライアント処理開始
                 }
                 _ = shutdown_rx.recv() => {
-                    printdaytimeln!(LOG_INFO, "[main] 再起動のためリスナー再バインド"); // 再起動通知
+                    printdaytimeln!(LOG_INFO, "[main] 再起動のためリスナー再バインド\n"); // 再起動通知
                     // 設定再読込
                     let new_config = load_config(&*config_path);
                     *config.write().unwrap() = new_config;

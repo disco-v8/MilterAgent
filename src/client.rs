@@ -271,22 +271,17 @@ pub async fn handle_client(
                         // クライアント(Sendmail/Postfix)への応答処理
                         send_milter_response(&mut stream, &peer_addr, filter_result).await;
                         // スパム判定され、かつSpamhaus_reportがyesの場合のみ報告
-                        if (action == "WARN" || action == "REJECT") && config_val.spamhaus_report {
-                            if let Some(remote_ip) = mail_values.get("decode_remote_ip") {
-                                if let Err(e) = report_to_spamhaus(
-                                    remote_ip,
-                                    &format!("Spam filtering {} with MilterAgent", logname),
-                                    &config_val,
-                                )
-                                .await
-                                {
-                                    crate::printdaytimeln!(
-                                        LOG_INFO,
-                                        "[client] Spamhaus設定エラー: {}",
-                                        e
-                                    );
-                                }
-                            }
+                        if (action == "WARN" || action == "REJECT")
+                            && config_val.spamhaus_report
+                            && let Some(remote_ip) = mail_values.get("decode_remote_ip")
+                            && let Err(e) = report_to_spamhaus(
+                                remote_ip,
+                                &format!("Spam filtering {} with MilterAgent", logname),
+                                &config_val,
+                            )
+                            .await
+                        {
+                            crate::printdaytimeln!(LOG_INFO, "[client] Spamhaus設定エラー: {}", e);
                         }
                     }
                 } else {

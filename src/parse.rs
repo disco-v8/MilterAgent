@@ -129,10 +129,10 @@ pub fn parse_mail(
             let mut ip = "unknown".to_string();
 
             // IPアドレス部分を抽出 "[xxx.xxx.xxx.xxx]" 形式
-            if let Some(start) = macro_space.find('[') {
-                if let Some(end) = macro_space.find(']') {
-                    ip = macro_space[start + 1..end].to_string();
-                }
+            if let Some(start) = macro_space.find('[')
+                && let Some(end) = macro_space.find(']')
+            {
+                ip = macro_space[start + 1..end].to_string();
             }
 
             // ホスト名部分を抽出（IP部分より前）

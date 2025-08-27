@@ -404,30 +404,28 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                             if let Ok(entries) = std::fs::read_dir(dir) {
                                 for entry in entries.flatten() {
                                     let path = entry.path();
-                                    if path.is_file() {
-                                        if let Some(ext) = path.extension() {
-                                            if ext == "conf" {
-                                                crate::printdaytimeln!(
-                                                    LOG_INFO,
-                                                    "[init] loading sub-conf file: {}",
-                                                    path.display()
-                                                );
-                                                if let Ok(sub_text) = std::fs::read_to_string(&path)
-                                                {
-                                                    crate::printdaytimeln!(
-                                                        LOG_DEBUG,
-                                                        "[init] file content length: {} bytes",
-                                                        sub_text.len()
-                                                    );
-                                                    parse_config_text(&sub_text, values);
-                                                } else {
-                                                    crate::printdaytimeln!(
-                                                        LOG_INFO,
-                                                        "[init] failed to read file: {}",
-                                                        path.display()
-                                                    );
-                                                }
-                                            }
+                                    if path.is_file()
+                                        && let Some(ext) = path.extension()
+                                        && ext == "conf"
+                                    {
+                                        crate::printdaytimeln!(
+                                            LOG_INFO,
+                                            "[init] loading sub-conf file: {}",
+                                            path.display()
+                                        );
+                                        if let Ok(sub_text) = std::fs::read_to_string(&path) {
+                                            crate::printdaytimeln!(
+                                                LOG_DEBUG,
+                                                "[init] file content length: {} bytes",
+                                                sub_text.len()
+                                            );
+                                            parse_config_text(&sub_text, values);
+                                        } else {
+                                            crate::printdaytimeln!(
+                                                LOG_INFO,
+                                                "[init] failed to read file: {}",
+                                                path.display()
+                                            );
                                         }
                                     }
                                 }
@@ -448,6 +446,12 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                 if let Some((key, _)) = split_key_value(line) {
                     crate::printdaytimeln!(LOG_INFO, "[init] Unknown Config Key: {}", key);
                 }
+            }
+            // ...existing code...
+            else if (line.contains(' ') || line.contains('\t'))
+                && let Some((key, _)) = split_key_value(line)
+            {
+                crate::printdaytimeln!(LOG_INFO, "[init] Unknown Config Key: {}", key);
             }
         }
     }
