@@ -442,12 +442,6 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                 continue;
             }
             // 未知の設定項目の処理 - 将来の拡張性のため警告を出力して無視
-            else if line.contains(' ') || line.contains('\t') {
-                if let Some((key, _)) = split_key_value(line) {
-                    crate::printdaytimeln!(LOG_INFO, "[init] Unknown Config Key: {}", key);
-                }
-            }
-            // ...existing code...
             else if (line.contains(' ') || line.contains('\t'))
                 && let Some((key, _)) = split_key_value(line)
             {

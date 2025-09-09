@@ -18,10 +18,11 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Instant;
 use unicode_normalization::UnicodeNormalization;
 
+use crate::init::{Config, LOG_INFO, LOG_TRACE};
 use crate::init::LOG_DEBUG;
-use crate::init::{Config, LOG_TRACE};
 
 /// フィルター判定関数（並列処理版）
 /// - mail_values: キーごとの値（header_～, decode_～など）
@@ -78,17 +79,22 @@ pub fn filter_check(
     // 結果格納用のMutex
     let result = Arc::new(Mutex::new(None::<(String, String)>)); // (action, logname)
 
+    // スレッド実行時間収集用（thread_index, Duration）
+    let thread_stats = Arc::new(Mutex::new(Vec::<(usize, std::time::Duration)>::new()));
+
     // スレッドハンドルを格納するベクタ
     let mut handles = vec![];
 
     // フィルターをチャンクに分割して各スレッドで処理
-    for chunk_filters in filters.chunks(chunk_size) {
+    for (i, chunk_filters) in filters.chunks(chunk_size).enumerate() {
         let chunk_filters = chunk_filters.to_vec();
         let should_stop = Arc::clone(&should_stop);
         let result = Arc::clone(&result);
         let mail_values = normalized_mail_values.clone();
+        let thread_stats = Arc::clone(&thread_stats);
 
         let handle = thread::spawn(move || {
+            let t0 = Instant::now();
             // チャンク内の各フィルターを順次処理
             for (logname, rules) in chunk_filters {
                 // 早期終了チェック
@@ -119,6 +125,11 @@ pub fn filter_check(
                     break;
                 }
             }
+            // スレッドの処理時間を記録
+            let elapsed = t0.elapsed();
+            if let Ok(mut st) = thread_stats.lock() {
+                st.push((i, elapsed));
+            }
         });
 
         handles.push(handle);
@@ -127,6 +138,14 @@ pub fn filter_check(
     // 全スレッドの完了を待機
     for handle in handles {
         handle.join().unwrap();
+    }
+
+    // スレッド実行時間を出力（thread_stats をスレッド番号順にソートして表示）
+    if let Ok(mut stats) = thread_stats.lock() {
+        stats.sort_by_key(|(i, _)| *i);
+        for (idx, dur) in stats.iter() {
+            crate::printdaytimeln!(LOG_INFO, "[filter] thread{} elapsed: {:?}", idx, dur);
+        }
     }
 
     // 結果を返す
