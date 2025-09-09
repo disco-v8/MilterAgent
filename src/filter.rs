@@ -21,8 +21,8 @@ use std::thread;
 use std::time::Instant;
 use unicode_normalization::UnicodeNormalization;
 
-use crate::init::{Config, LOG_INFO, LOG_TRACE};
 use crate::init::LOG_DEBUG;
+use crate::init::{Config, LOG_INFO, LOG_TRACE};
 
 /// フィルター判定関数（並列処理版）
 /// - mail_values: キーごとの値（header_～, decode_～など）
