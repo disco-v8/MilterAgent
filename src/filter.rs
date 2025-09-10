@@ -22,7 +22,7 @@ use std::time::Instant;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::init::LOG_DEBUG;
-use crate::init::{Config, LOG_INFO, LOG_TRACE};
+use crate::init::{Config, LOG_TRACE};
 
 /// フィルター判定関数（並列処理版）
 /// - mail_values: キーごとの値（header_～, decode_～など）
@@ -144,7 +144,7 @@ pub fn filter_check(
     if let Ok(mut stats) = thread_stats.lock() {
         stats.sort_by_key(|(i, _)| *i);
         for (idx, dur) in stats.iter() {
-            crate::printdaytimeln!(LOG_INFO, "[filter] thread{} elapsed: {:?}", idx, dur);
+            crate::printdaytimeln!(LOG_TRACE, "[filter] thread{} elapsed: {:?}", idx, dur);
         }
     }
 
