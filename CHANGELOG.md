@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2025-09-18
+
+### Added
+- Japanese text sanitization and From header spoofing countermeasures
+- Removal of invisible and bidirectional control characters in Japanese text
+- Mitigation of address spoofing via From name manipulation
+
+## [0.3.1] - 2025-08-20
+
+### Fixed
+- Mitigation of recursion depth limitations
+- Modified processing to avoid recursion depth issues in fancy-regex
+
+## [0.3.0] - 2025-08-17 - Semantic Filtering Reinforced
+
+### Added
+- Unicode normalization (NFKC) and invisible character stripping to Subject/From headers
+- Improved spoofing resistance against obfuscated Unicode and bidirectional control characters
+- Enhanced semantic matching accuracy and operational reproducibility
+
 ## [0.2.0] - 2025-08-08
 
 ### Added

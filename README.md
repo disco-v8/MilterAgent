@@ -319,6 +319,9 @@ You can test the server by sending emails through a configured Postfix instance 
 
 ## Changelog
 
+### v0.3.2（2025-09-18）Japanese text sanitization and From header spoofing countermeasures.
+- Removal of invisible and bidirectional control characters in Japanese text, and mitigation of address spoofing via From name manipulation.
+
 ### v0.3.1（2025-08-20）Mitigation of recursion depth limitations
 - Modified processing to avoid recursion depth issues in fancy-regex.
 

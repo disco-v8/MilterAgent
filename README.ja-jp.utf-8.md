@@ -244,6 +244,9 @@ decode_html:https?://(?!.*\.(d\.com|e\.com)\b).+:REJECT
 
 ## 変更履歴
 
+### v0.3.2（2025-09-18）Japanese text sanitization and From header spoofing countermeasures.
+- 日本語での不可視文字や双方向制御文字の除去、及びFrom名称でのアドレス詐称対応
+
 ### v0.3.1（2025-08-20）Mitigation of recursion depth limitations
 - fancy-regex再帰深度問題を回避すべくdecode_textとdecode_htmlを細分化する処理に変更
 
