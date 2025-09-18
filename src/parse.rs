@@ -37,9 +37,7 @@ use crate::init::{LOG_DEBUG, LOG_INFO, LOG_TRACE};
 /// - その他の不可視文字（\u00AD, \u034Fなど）を除去
 /// - 日本語文字（ひらがな・カタカナ・漢字）は保持
 fn remove_invisible_and_bidi_chars(s: &str) -> String {
-    s.chars()
-        .filter(|&c| !is_invisible_or_bidi(c))
-        .collect()
+    s.chars().filter(|&c| !is_invisible_or_bidi(c)).collect()
 }
 
 /// 文字が不可視文字またはBiDi制御文字かを判定する関数
@@ -55,13 +53,33 @@ fn is_invisible_or_bidi(c: char) -> bool {
         return true;
     }
     // ゼロ幅文字とBiDi制御文字
-    matches!(c,
+    matches!(
+        c,
         '\u{200B}' | '\u{200C}' | '\u{200D}' | '\u{200E}' | '\u{200F}' | // ゼロ幅文字
         '\u{FEFF}' | // BOM
         '\u{202A}' | '\u{202B}' | '\u{202C}' | '\u{202D}' | '\u{202E}' | // BiDi制御文字
         '\u{00AD}' | '\u{034F}' | // その他の不可視文字
         '\u{2060}' | '\u{2061}' | '\u{2062}' | '\u{2063}' | '\u{2064}' // 追加の不可視文字
     )
+}
+
+/// 文字列に日本語文字（ひらがな・カタカナ・漢字）が含まれているかを判定する関数
+///
+/// # 引数
+/// - `s`: 判定対象の文字列
+///
+/// # 戻り値
+/// - bool: 日本語文字が含まれているならtrue
+fn contains_japanese_chars(s: &str) -> bool {
+    s.chars().any(|c| {
+        let code = c as u32;
+        // ひらがな: U+3040-U+309F
+        // カタカナ: U+30A0-U+30FF
+        // 漢字: U+4E00-U+9FFF
+        (0x3040..=0x309F).contains(&code)
+            || (0x30A0..=0x30FF).contains(&code)
+            || (0x4E00..=0x9FFF).contains(&code)
+    })
 }
 
 /// パース済みメール情報の構造体
@@ -211,8 +229,12 @@ pub fn parse_mail(
             })
             .unwrap_or_else(|| "(なし)".to_string()); // From無し時のデフォルト値
 
-        // Fromから不可視文字とBiDi制御文字を除去
-        let from = remove_invisible_and_bidi_chars(&from);
+        // Fromに日本語文字がある場合のみ、不可視文字とBiDi制御文字を除去
+        let from = if contains_japanese_chars(&from) {
+            remove_invisible_and_bidi_chars(&from)
+        } else {
+            from
+        };
 
         // === 宛先（To）情報の抽出・整形 ===
         let to = msg
@@ -237,8 +259,12 @@ pub fn parse_mail(
         // === 件名（Subject）情報の抽出 ===
         let subject = msg.subject().unwrap_or("(なし)"); // 件名無し時のデフォルト値
 
-        // Subjectから不可視文字とBiDi制御文字を除去
-        let subject = remove_invisible_and_bidi_chars(subject);
+        // Subjectに日本語文字がある場合のみ、不可視文字とBiDi制御文字を除去
+        let subject = if contains_japanese_chars(subject) {
+            remove_invisible_and_bidi_chars(subject)
+        } else {
+            subject.to_string()
+        };
 
         // 基本情報の出力2
         crate::printdaytimeln!(LOG_INFO, "[parser] from: {}", from); // From出力
