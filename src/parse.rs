@@ -37,7 +37,9 @@ use crate::init::{LOG_DEBUG, LOG_INFO, LOG_TRACE};
 /// - その他の不可視文字（\u00AD, \u034Fなど）を除去
 /// - 日本語文字（ひらがな・カタカナ・漢字）は保持
 fn remove_invisible_and_bidi_chars(s: &str) -> String {
-    s.chars().filter(|&c| !is_invisible_or_bidi(c)).collect()
+    s.chars()
+        .map(|c| if is_invisible_or_bidi(c) { '_' } else { c })
+        .collect()
 }
 
 /// 文字が不可視文字またはBiDi制御文字かを判定する関数
