@@ -22,6 +22,48 @@ use std::collections::HashMap;
 
 use crate::init::{LOG_DEBUG, LOG_INFO, LOG_TRACE};
 
+/// 不可視文字と双方向制御文字を除去する関数
+///
+/// # 引数
+/// - `s`: 処理対象の文字列
+///
+/// # 戻り値
+/// - String: 不可視文字とBiDi制御文字を除去した文字列
+///
+/// # 説明
+/// - 制御文字（改行・タブ以外）
+/// - ゼロ幅文字（\u200B-\u200F, \uFEFF）
+/// - BiDi制御文字（\u202A-\u202E）
+/// - その他の不可視文字（\u00AD, \u034Fなど）を除去
+/// - 日本語文字（ひらがな・カタカナ・漢字）は保持
+fn remove_invisible_and_bidi_chars(s: &str) -> String {
+    s.chars()
+        .filter(|&c| !is_invisible_or_bidi(c))
+        .collect()
+}
+
+/// 文字が不可視文字またはBiDi制御文字かを判定する関数
+///
+/// # 引数
+/// - `c`: 判定対象の文字
+///
+/// # 戻り値
+/// - bool: 除去対象ならtrue
+fn is_invisible_or_bidi(c: char) -> bool {
+    // 制御文字（改行・タブ・スペースは除く）
+    if c.is_control() && !matches!(c, '\n' | '\r' | '\t' | ' ') {
+        return true;
+    }
+    // ゼロ幅文字とBiDi制御文字
+    matches!(c,
+        '\u{200B}' | '\u{200C}' | '\u{200D}' | '\u{200E}' | '\u{200F}' | // ゼロ幅文字
+        '\u{FEFF}' | // BOM
+        '\u{202A}' | '\u{202B}' | '\u{202C}' | '\u{202D}' | '\u{202E}' | // BiDi制御文字
+        '\u{00AD}' | '\u{034F}' | // その他の不可視文字
+        '\u{2060}' | '\u{2061}' | '\u{2062}' | '\u{2063}' | '\u{2064}' // 追加の不可視文字
+    )
+}
+
 /// パース済みメール情報の構造体
 #[derive(Debug, Clone)]
 pub struct ParsedMail {
@@ -169,6 +211,9 @@ pub fn parse_mail(
             })
             .unwrap_or_else(|| "(なし)".to_string()); // From無し時のデフォルト値
 
+        // Fromから不可視文字とBiDi制御文字を除去
+        let from = remove_invisible_and_bidi_chars(&from);
+
         // === 宛先（To）情報の抽出・整形 ===
         let to = msg
             .to()
@@ -191,6 +236,9 @@ pub fn parse_mail(
 
         // === 件名（Subject）情報の抽出 ===
         let subject = msg.subject().unwrap_or("(なし)"); // 件名無し時のデフォルト値
+
+        // Subjectから不可視文字とBiDi制御文字を除去
+        let subject = remove_invisible_and_bidi_chars(subject);
 
         // 基本情報の出力2
         crate::printdaytimeln!(LOG_INFO, "[parser] from: {}", from); // From出力
