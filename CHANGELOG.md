@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2025-10-02
+
+### Changed
+- Optimized loopback address connection handling to avoid unnecessary processing
+- Loopback connections (127.0.0.1, ::1) are now silently dropped without logging or spawning client threads
+
 ## [0.3.2] - 2025-09-18
 
 ### Added

@@ -23,14 +23,12 @@ mod milter_command; // Milterコマンド定義
 mod parse; // メールパース・出力処理 // フィルター判定ロジック
 mod spamhaus; // Spamhausレポート処理
 
-use init::load_config;
+use init::{LOG_INFO, LOG_TRACE, load_config};
 use std::env;
 use std::sync::{Arc, RwLock}; // スレッド安全な参照カウント・ロック
 #[cfg(unix)]
 use tokio::signal::unix::{SignalKind, signal}; // Unix系: シグナル受信
-use tokio::{net::TcpListener, sync::broadcast};
-
-use crate::init::LOG_INFO; // 非同期TCPサーバ・ブロードキャスト // 設定ファイル読込
+use tokio::{net::TcpListener, sync::broadcast}; // 非同期TCPサーバ・ブロードキャスト
 
 /// 非同期メイン関数（Tokioランタイム）
 /// - サーバー起動・設定管理・クライアント接続受付・シグナル処理
@@ -142,6 +140,12 @@ async fn main() {
             // クライアント受信ループ
             tokio::select! {
                 Ok((stream, addr)) = listener.accept() => {
+                    // ループバックアドレスからの接続は即切断
+                    if addr.ip().is_loopback() {
+                        printdaytimeln!(LOG_TRACE, "[client] 接続: {} (Loopback address)", addr); // クライアントがループバックアドレスからの新規接続だったら
+                        drop(stream);
+                        continue;
+                    }
                     printdaytimeln!(LOG_INFO, "[client] 接続: {}", addr); // クライアント新規接続
                     let shutdown_rx = shutdown_tx.subscribe(); // クライアント用レシーバ
                     let config = Arc::clone(&config);

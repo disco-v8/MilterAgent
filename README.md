@@ -319,6 +319,10 @@ You can test the server by sending emails through a configured Postfix instance 
 
 ## Changelog
 
+### v0.3.3（2025-10-02）Loopback Address Connection Optimization
+- Optimized loopback address connection handling to avoid unnecessary processing
+- Loopback connections (127.0.0.1, ::1) are now silently dropped without logging or spawning client threads
+
 ### v0.3.2（2025-09-18）Japanese text sanitization and From header spoofing countermeasures.
 - Removal of invisible and bidirectional control characters in Japanese text, and mitigation of address spoofing via From name manipulation.
 
