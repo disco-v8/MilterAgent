@@ -51,12 +51,12 @@ pub fn remove_invisible_and_bidi_chars(s: &str) -> String {
 /// - bool: 除去対象ならtrue
 pub fn is_invisible_or_bidi(c: char) -> bool {
     let code = c as u32;
-    
+
     // 制御文字（改行・タブ・スペースは除く）
     if c.is_control() && !matches!(c, '\n' | '\r' | '\t' | ' ') {
         return true;
     }
-    
+
     // 包括的な不可視文字・制御文字の除去
     code == 0xFEFF || // BOM
     (0x0000..=0x001F).contains(&code) || // C0 controls
@@ -71,10 +71,8 @@ pub fn is_invisible_or_bidi(c: char) -> bool {
     (0xFE00..=0xFE0F).contains(&code) || // Variation Selectors
     code == 0x180E || // Mongolian Vowel Separator
     code == 0x00AD || // Soft hyphen
-    code == 0x034F    // Combining grapheme joiner
+    code == 0x034F // Combining grapheme joiner
 }
-
-
 
 /// パース済みメール情報の構造体
 #[derive(Debug, Clone)]
