@@ -140,21 +140,7 @@ async fn main() {
             // クライアント受信ループ
             tokio::select! {
                 Ok((stream, addr)) = listener.accept() => {
-                    // ループバックアドレスからの接続は即切断
-                    let ip = addr.ip();
-                    let is_loopback = ip.is_loopback() ||
-                        (ip.is_ipv6() &&
-                         if let std::net::IpAddr::V6(v6) = ip {
-                             v6.to_ipv4_mapped().is_some_and(|v4| v4.is_loopback())
-                         } else {
-                             false
-                         });
-                    if is_loopback {
-                        printdaytimeln!(LOG_TRACE, "[client] 接続: {} (Loopback address)", addr); // クライアントがループバックアドレスからの新規接続だったら
-                        drop(stream);
-                        continue;
-                    }
-                    printdaytimeln!(LOG_INFO, "[client] 接続: {}", addr); // クライアント新規接続
+                    printdaytimeln!(LOG_TRACE, "[client] 接続: {}", addr); // クライアント新規接続
                     let shutdown_rx = shutdown_tx.subscribe(); // クライアント用レシーバ
                     let config = Arc::clone(&config);
                     tokio::spawn(client::handle_client(stream, shutdown_rx, config)); // クライアント処理開始

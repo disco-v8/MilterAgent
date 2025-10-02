@@ -205,6 +205,17 @@ pub fn parse_mail(
             ("unknown".to_string(), "unknown".to_string())
         };
 
+        // ループバックアドレスからの接続は即切断（ログなし）
+        if remote_ip == "127.0.0.1" || remote_ip == "::1" || remote_ip.starts_with("::ffff:127.") {
+            crate::printdaytimeln!(
+                LOG_TRACE,
+                "[parser] remote_host: {} (Loopback)",
+                remote_host
+            );
+            crate::printdaytimeln!(LOG_TRACE, "[parser] remote_ip: {} (Loopback)", remote_ip);
+            return None;
+        }
+
         // 基本情報の出力1
         crate::printdaytimeln!(LOG_INFO, "[parser] remote_host: {}", remote_host);
         crate::printdaytimeln!(LOG_INFO, "[parser] remote_ip: {}", remote_ip);
