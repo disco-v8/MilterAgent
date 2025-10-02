@@ -22,6 +22,10 @@ MilterAgent is a comprehensive email security solution that implements the Milte
   - Negative lookahead (`(?!...)`) and positive lookahead (`(?=...)`)
   - Negative lookbehind (`(?<!...)`) and positive lookbehind (`(?<=...)`)
   - Complex pattern matching for sophisticated email filtering
+- **Unicode Security**: Comprehensive invisible character filtering and normalization:
+  - Removal of invisible characters, BiDi controls, and combining diacritics
+  - Protection against Unicode-based spoofing attacks in all languages
+  - NFKC normalization for consistent text processing
 - **Milter Protocol Support**: Full implementation of the Milter protocol for seamless integration
 - **Real-time Processing**: Asynchronous Rust implementation for handling thousands of concurrent connections
 - **High-Speed Parallel Filtering**: Multi-threaded filter evaluation with parallel execution for maximum performance
@@ -322,6 +326,9 @@ You can test the server by sending emails through a configured Postfix instance 
 ### v0.3.3（2025-10-02）Loopback Address Connection Optimization
 - Optimized loopback address connection handling to avoid unnecessary processing
 - Loopback connections (127.0.0.1, ::1) are now silently dropped without logging or spawning client threads
+- Enhanced invisible character filtering with comprehensive Unicode coverage
+- Removed language-specific restrictions for universal protection against invisible character attacks
+- Consolidated filtering logic between parse.rs and filter.rs for consistency
 
 ### v0.3.2（2025-09-18）Japanese text sanitization and From header spoofing countermeasures.
 - Removal of invisible and bidirectional control characters in Japanese text, and mitigation of address spoofing via From name manipulation.
