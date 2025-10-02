@@ -160,31 +160,14 @@ pub fn filter_check(
 
 /// 文字列をNFKC正規化し、不要な制御文字や結合文字を除去する
 /// - NFKC: 全角/半角・合成文字などを正規化
-/// - BOMやゼロ幅スペース、双方向制御文字、結合記号などを除去
+/// - すべての文字列に対して不可視文字・BiDi制御文字を除去
 /// - 最後に空白を除去して連結
 fn normalize_mail_value(s: &str) -> String {
     // 1. NFKC正規化（全角/半角・合成文字などを統一）
     let nfkc = s.nfkc().collect::<String>();
 
-    // 2. 不要な制御文字・結合文字を除去
-    let cleaned: String = nfkc
-        .chars()
-        .filter(|c| {
-            let code = *c as u32;
-            !(code == 0xFEFF || // BOM
-              (0x0000..=0x001F).contains(&code) || // C0 controls
-              code == 0x007F || // DEL
-              (0x200B..=0x200F).contains(&code) || // ZWSP, ZWNJ, ZWJ, LRM, RLM
-              (0x202A..=0x202E).contains(&code) || // Bidi controls
-              (0x2060..=0x206F).contains(&code) || // Word Joiner etc.
-              (0x0300..=0x036F).contains(&code) || // Combining diacritics
-              (0x2000..=0x200A).contains(&code) || // Invisible spaces
-              code == 0x202F || // Narrow NBSP
-              code == 0x00A0 || // NBSP
-              (0xFE00..=0xFE0F).contains(&code) || // Variation Selectors
-              code == 0x180E) // Mongolian Vowel Separator
-        })
-        .collect();
+    // 2. 不可視文字・BiDi制御文字を除去（すべての文字列に適用）
+    let cleaned = crate::parse::remove_invisible_and_bidi_chars(&nfkc);
 
     // 3. 空白（スペース・改行等）で分割し、すべて連結（余計な空白を除去）
     cleaned.split_whitespace().collect::<String>()

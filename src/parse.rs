@@ -22,21 +22,23 @@ use std::collections::HashMap;
 
 use crate::init::{LOG_DEBUG, LOG_INFO, LOG_TRACE};
 
-/// 不可視文字と双方向制御文字を除去する関数
+/// 不可視文字と制御文字を包括的に除去する関数
 ///
 /// # 引数
 /// - `s`: 処理対象の文字列
 ///
 /// # 戻り値
-/// - String: 不可視文字とBiDi制御文字を除去した文字列
+/// - String: 不可視文字と制御文字を除去した文字列
 ///
 /// # 説明
-/// - 制御文字（改行・タブ以外）
-/// - ゼロ幅文字（\u200B-\u200F, \uFEFF）
+/// - C0/C1制御文字（改行・タブ・スペース以外）
+/// - ゼロ幅文字（\u200B-\u200F）、BOM（\uFEFF）
 /// - BiDi制御文字（\u202A-\u202E）
-/// - その他の不可視文字（\u00AD, \u034Fなど）を除去
-/// - 日本語文字（ひらがな・カタカナ・漢字）は保持
-fn remove_invisible_and_bidi_chars(s: &str) -> String {
+/// - 結合記号（\u0300-\u036F）
+/// - 不可視スペース類（\u2000-\u200A, \u00A0, \u202F）
+/// - 異字体セレクタ（\uFE00-\uFE0F）
+/// - その他の不可視文字（\u00AD, \u034F, \u180E等）を除去
+pub fn remove_invisible_and_bidi_chars(s: &str) -> String {
     s.chars().filter(|&c| !is_invisible_or_bidi(c)).collect()
 }
 
@@ -47,40 +49,32 @@ fn remove_invisible_and_bidi_chars(s: &str) -> String {
 ///
 /// # 戻り値
 /// - bool: 除去対象ならtrue
-fn is_invisible_or_bidi(c: char) -> bool {
+pub fn is_invisible_or_bidi(c: char) -> bool {
+    let code = c as u32;
+    
     // 制御文字（改行・タブ・スペースは除く）
     if c.is_control() && !matches!(c, '\n' | '\r' | '\t' | ' ') {
         return true;
     }
-    // ゼロ幅文字とBiDi制御文字
-    matches!(
-        c,
-        '\u{200B}' | '\u{200C}' | '\u{200D}' | '\u{200E}' | '\u{200F}' | // ゼロ幅文字
-        '\u{FEFF}' | // BOM
-        '\u{202A}' | '\u{202B}' | '\u{202C}' | '\u{202D}' | '\u{202E}' | // BiDi制御文字
-        '\u{00AD}' | '\u{034F}' | // その他の不可視文字
-        '\u{2060}' | '\u{2061}' | '\u{2062}' | '\u{2063}' | '\u{2064}' // 追加の不可視文字
-    )
+    
+    // 包括的な不可視文字・制御文字の除去
+    code == 0xFEFF || // BOM
+    (0x0000..=0x001F).contains(&code) || // C0 controls
+    code == 0x007F || // DEL
+    (0x200B..=0x200F).contains(&code) || // ZWSP, ZWNJ, ZWJ, LRM, RLM
+    (0x202A..=0x202E).contains(&code) || // Bidi controls
+    (0x2060..=0x206F).contains(&code) || // Word Joiner etc.
+    (0x0300..=0x036F).contains(&code) || // Combining diacritics
+    (0x2000..=0x200A).contains(&code) || // Invisible spaces
+    code == 0x202F || // Narrow NBSP
+    code == 0x00A0 || // NBSP
+    (0xFE00..=0xFE0F).contains(&code) || // Variation Selectors
+    code == 0x180E || // Mongolian Vowel Separator
+    code == 0x00AD || // Soft hyphen
+    code == 0x034F    // Combining grapheme joiner
 }
 
-/// 文字列に日本語文字（ひらがな・カタカナ・漢字）が含まれているかを判定する関数
-///
-/// # 引数
-/// - `s`: 判定対象の文字列
-///
-/// # 戻り値
-/// - bool: 日本語文字が含まれているならtrue
-fn contains_japanese_chars(s: &str) -> bool {
-    s.chars().any(|c| {
-        let code = c as u32;
-        // ひらがな: U+3040-U+309F
-        // カタカナ: U+30A0-U+30FF
-        // 漢字: U+4E00-U+9FFF
-        (0x3040..=0x309F).contains(&code)
-            || (0x30A0..=0x30FF).contains(&code)
-            || (0x4E00..=0x9FFF).contains(&code)
-    })
-}
+
 
 /// パース済みメール情報の構造体
 #[derive(Debug, Clone)]
@@ -240,12 +234,8 @@ pub fn parse_mail(
             })
             .unwrap_or_else(|| "(なし)".to_string()); // From無し時のデフォルト値
 
-        // Fromに日本語文字がある場合のみ、不可視文字とBiDi制御文字を除去
-        let from = if contains_japanese_chars(&from) {
-            remove_invisible_and_bidi_chars(&from)
-        } else {
-            from
-        };
+        // From文字列から不可視文字とBiDi制御文字を除去
+        let from = remove_invisible_and_bidi_chars(&from);
 
         // === 宛先（To）情報の抽出・整形 ===
         let to = msg
@@ -270,12 +260,8 @@ pub fn parse_mail(
         // === 件名（Subject）情報の抽出 ===
         let subject = msg.subject().unwrap_or("(なし)"); // 件名無し時のデフォルト値
 
-        // Subjectに日本語文字がある場合のみ、不可視文字とBiDi制御文字を除去
-        let subject = if contains_japanese_chars(subject) {
-            remove_invisible_and_bidi_chars(subject)
-        } else {
-            subject.to_string()
-        };
+        // Subject文字列から不可視文字とBiDi制御文字を除去
+        let subject = remove_invisible_and_bidi_chars(subject);
 
         // 基本情報の出力2
         crate::printdaytimeln!(LOG_INFO, "[parser] from: {}", from); // From出力
