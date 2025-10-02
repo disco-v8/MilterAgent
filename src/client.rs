@@ -25,7 +25,7 @@ use tokio::{
 
 use super::milter_command::MilterCommand;
 use crate::{
-    init::{LOG_DEBUG, LOG_INFO},
+    init::{LOG_DEBUG, LOG_INFO, LOG_TRACE},
     milter::{
         decode_body, decode_connect, decode_data_macros, decode_header, decode_helo, decode_optneg,
         send_milter_response,
@@ -87,7 +87,7 @@ pub async fn handle_client(
             } {
                 Ok(Ok(0)) => {
                     // クライアント切断（0バイト受信）
-                    crate::printdaytimeln!(LOG_INFO, "[client] 切断(phase1): {}", peer_addr);
+                    crate::printdaytimeln!(LOG_TRACE, "[client] 切断(phase1): {}", peer_addr);
                     return; // ループ脱出
                 }
                 Ok(Ok(n)) => {
