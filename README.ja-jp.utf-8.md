@@ -254,6 +254,7 @@ decode_html:https?://(?!.*\.(d\.com|e\.com)\b).+:REJECT
 - 包括的なUnicode対応による不可視文字フィルタリングの強化
 - 不可視文字攻撃からの汎用的な保護のため、言語固有の制限を削除
 - 一貫性のためparse.rsとfilter.rs間のフィルタリングロジックを統一
+- リモートIPフィルタリングの詳細制御のための`RemoteIP_Target`設定オプションを追加
 
 ### v0.3.2（2025-09-18）Japanese text sanitization and From header spoofing countermeasures.
 - 日本語での不可視文字や双方向制御文字の除去、及びFrom名称でのアドレス詐称対応

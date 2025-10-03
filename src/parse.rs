@@ -142,6 +142,7 @@ pub fn parse_mail(
     header_fields: &HashMap<String, Vec<String>>,
     body_field: &str,
     macro_fields: &HashMap<String, String>,
+    remote_ip_target: u8, // 0=外部のみ(ループバック拒否), 1=内部のみ(ループバックのみ許可), 2=全て許可
 ) -> Option<ParsedMail> {
     // ヘッダ情報とボディ情報を合体し、RFC準拠のメール全体文字列を作成
     let mut mail_string = String::new(); // メール全体の文字列構築用バッファ
@@ -197,15 +198,62 @@ pub fn parse_mail(
             ("unknown".to_string(), "unknown".to_string())
         };
 
-        // ループバックアドレスからの接続は即切断（ログなし）
-        if remote_ip == "127.0.0.1" || remote_ip == "::1" || remote_ip.starts_with("::ffff:127.") {
-            crate::printdaytimeln!(
-                LOG_TRACE,
-                "[parser] remote_host: {} (Loopback)",
-                remote_host
-            );
-            crate::printdaytimeln!(LOG_TRACE, "[parser] remote_ip: {} (Loopback)", remote_ip);
-            return None;
+        // RemoteIP_Target に基づく早期切断の判定
+        // 0: 外部からのメールのみ対象(デフォルト) -> ループバックは即切断
+        // 1: 内部からのメールのみ対象 -> ループバック以外は即切断
+        // 2: 全てのメールを対象 -> 切断しない
+        let is_loopback =
+            remote_ip == "127.0.0.1" || remote_ip == "::1" || remote_ip.starts_with("::ffff:127.");
+        match remote_ip_target {
+            0 => {
+                if is_loopback {
+                    crate::printdaytimeln!(
+                        LOG_TRACE,
+                        "[parser] remote_host: {} (Loopback)",
+                        remote_host
+                    );
+                    crate::printdaytimeln!(
+                        LOG_TRACE,
+                        "[parser] remote_ip: {} (Loopback)",
+                        remote_ip
+                    );
+                    return None;
+                }
+            }
+            1 => {
+                if !is_loopback {
+                    crate::printdaytimeln!(
+                        LOG_TRACE,
+                        "[parser] remote_host: {} (Not Loopback)",
+                        remote_host
+                    );
+                    crate::printdaytimeln!(
+                        LOG_TRACE,
+                        "[parser] remote_ip: {} (Not Loopback)",
+                        remote_ip
+                    );
+                    return None;
+                }
+            }
+            2 => {
+                // 何もしない（全て許可）
+            }
+            _ => {
+                // 未知の値は安全のため0相当として扱う
+                if is_loopback {
+                    crate::printdaytimeln!(
+                        LOG_TRACE,
+                        "[parser] remote_host: {} (Loopback)",
+                        remote_host
+                    );
+                    crate::printdaytimeln!(
+                        LOG_TRACE,
+                        "[parser] remote_ip: {} (Loopback)",
+                        remote_ip
+                    );
+                    return None;
+                }
+            }
         }
 
         // 基本情報の出力1

@@ -329,6 +329,7 @@ You can test the server by sending emails through a configured Postfix instance 
 - Enhanced invisible character filtering with comprehensive Unicode coverage
 - Removed language-specific restrictions for universal protection against invisible character attacks
 - Consolidated filtering logic between parse.rs and filter.rs for consistency
+- Added `RemoteIP_Target` configuration option for granular remote IP filtering control
 
 ### v0.3.2（2025-09-18）Japanese text sanitization and From header spoofing countermeasures.
 - Removal of invisible and bidirectional control characters in Japanese text, and mitigation of address spoofing via From name manipulation.

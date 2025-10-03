@@ -38,6 +38,7 @@ pub struct Config {
     pub log_file: Option<String>, // ログ出力先ファイルパス（None時は標準出力）
     pub log_level: u8,            // ログ詳細度（0=info, 2=trace, 8=debug）
     pub filters: Vec<(String, Vec<FilterRule>)>, // フィルター定義リスト（名前とルールセット）
+    pub remote_ip_target: u8,     // RemoteIP_Target: 0=外部のみ,1=内部のみ,2=全て
     pub spamhaus_report: bool,    // Spamhaus情報をログ出力するかのフラグ
     pub spamhaus_api_token: Option<String>, // Spamhaus API認証用トークン
     pub spamhaus_api_url: Option<String>, // Spamhaus API接続先エンドポイント
@@ -78,6 +79,7 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
         log_file: Option<String>,                // ログファイル出力先
         log_level: u8,                           // ログ詳細度設定
         filters: Vec<(String, Vec<FilterRule>)>, // フィルタールール群
+        remote_ip_target: u8,                    // RemoteIP_Target: 0=外部のみ,1=内部のみ,2=全て
         spamhaus_report: bool,                   // Spamhaus連携フラグ
         spamhaus_api_token: Option<String>,      // API認証トークン
         spamhaus_api_url: Option<String>,        // API接続先URL
@@ -115,6 +117,7 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                 || line.starts_with("Client_timeout")
                 || line.starts_with("Log_file")
                 || line.starts_with("Log_level")
+                || line.starts_with("RemoteIP_Target")
                 || line.starts_with("Spamhaus_report")
                 || line.starts_with("Spamhaus_api_token")
                 || line.starts_with("Spamhaus_api_url")
@@ -236,6 +239,23 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                     let report_str = full_value.trim().to_ascii_lowercase();
                     if report_str == "yes" || report_str == "true" || report_str == "1" {
                         values.spamhaus_report = true;
+                    }
+                }
+            }
+            // RemoteIP_Target設定 - 接続元IPに基づく対象範囲制御
+            else if line.starts_with("RemoteIP_Target") {
+                if let Some((_, val_str)) = split_key_value(line) {
+                    let full_value = collect_multiline_value(&mut lines, val_str, false);
+                    // 整数としてパースし、0/1/2の範囲に制限
+                    if let Ok(v) = full_value.trim().parse::<i64>() {
+                        let v = if v < 0 {
+                            0
+                        } else if v > 2 {
+                            2
+                        } else {
+                            v as u8
+                        };
+                        values.remote_ip_target = v;
                     }
                 }
             }
@@ -460,6 +480,7 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
         log_file: None,        // デフォルトは標準出力
         log_level: 0,          // デフォルトはinfoレベル
         filters: Vec::new(),
+        remote_ip_target: 0,    // デフォルトは0（外部のみ）
         spamhaus_report: false, // デフォルトはSpamhaus情報非出力
         spamhaus_api_token: None,
         spamhaus_api_url: None,
@@ -501,5 +522,6 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
         spamhaus_api_token: values.spamhaus_api_token,
         spamhaus_api_url: values.spamhaus_api_url,
         spamhaus_safe_addresses: values.spamhaus_safe_addresses,
+        remote_ip_target: values.remote_ip_target,
     }
 }

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced invisible character filtering with comprehensive Unicode coverage
 - Removed language-specific restrictions for universal protection against invisible character attacks
 - Consolidated filtering logic between parse.rs and filter.rs for consistency
+- `RemoteIP_Target` configuration option for granular remote IP filtering control
 
 ## [0.3.2] - 2025-09-18
 

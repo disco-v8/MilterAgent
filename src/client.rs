@@ -251,9 +251,12 @@ pub async fn handle_client(
             } else if let MilterCommand::Eoh = cmd {
                 if is_body_eob {
                     // パース処理でメール全体をパース・デバッグ出力・構造化
-                    if let Some(parsed_mail) =
-                        parse_mail(&header_fields, &body_field, &macro_fields)
-                    {
+                    if let Some(parsed_mail) = parse_mail(
+                        &header_fields,
+                        &body_field,
+                        &macro_fields,
+                        config_val.remote_ip_target,
+                    ) {
                         // フィルター用のHashMapに効率的に変換（構造体メソッド使用）
                         let mail_values = parsed_mail.into_hash_map();
                         // フィルター判定を実行（並列処理版）
