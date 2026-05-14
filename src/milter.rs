@@ -75,12 +75,12 @@ pub async fn decode_optneg(stream: &mut TcpStream, payload: &[u8]) -> u32 {
         // Step 3: アクションフラグの分解・個別機能の確認と出力
         let action_flags = [
             (MILTER_ACTION_ADD_HEADERS, "ADD_HEADERS"), // ヘッダ追加
-            (0x00000002, "CHANGE_BODY"),                // 本文変更
-            (0x00000004, "ADD_RECIPIENTS"),             // 宛先追加
-            (0x00000008, "DELETE_RECIPIENTS"),          // 宛先削除
-            (0x00000010, "QUARANTINE"),                 // 隔離
+            (0x00000002, "CHANGE_BODY"),       // 本文変更
+            (0x00000004, "ADD_RECIPIENTS"),    // 宛先追加
+            (0x00000008, "DELETE_RECIPIENTS"), // 宛先削除
+            (0x00000010, "QUARANTINE"),        // 隔離
             (MILTER_ACTION_REPLACE_HEADERS, "REPLACE_HEADERS"), // ヘッダ置換
-            (0x00000040, "CHANGE_REPLY"),               // 応答変更
+            (0x00000040, "CHANGE_REPLY"),      // 応答変更
         ];
 
         // 各アクションフラグが立っていれば出力
@@ -615,7 +615,9 @@ async fn send_subject_prefix_if_needed(
         return;
     }
 
-    let rewritten_subject = format!("{prefix}{subject}");
+    // CHGHEADERで渡す値はヘッダ名のコロン直後にそのまま連結されるため、
+    // 表示上もRFC上も自然な `Subject: ...` にするため先頭の空白を明示的に付ける。
+    let rewritten_subject = format!(" {prefix}{subject}");
     let reply_packet = build_change_header_packet("Subject", 1, &rewritten_subject);
     if let Err(e) = stream.write_all(&reply_packet).await {
         crate::printdaytimeln!(
