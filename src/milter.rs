@@ -20,7 +20,13 @@ use tokio::{
     net::TcpStream,    // 非同期TCPストリーム
 };
 
-use crate::init::{LOG_DEBUG, LOG_TRACE};
+use crate::init::{Config, LOG_DEBUG, LOG_TRACE};
+
+const MILTER_ACTION_ADD_HEADERS: u32 = 0x0000_0001;
+const MILTER_ACTION_REPLACE_HEADERS: u32 = 0x0000_0020;
+const SMFIR_ADDHEADER: u8 = 0x68;
+const SMFIR_CHGHEADER: u8 = 0x6d;
+const SMFIR_REPLYCODE: u8 = 0x79;
 
 /// OPTNEGコマンドのデコード・応答送信処理
 ///
@@ -49,7 +55,7 @@ use crate::init::{LOG_DEBUG, LOG_TRACE};
 /// # 重要な制約
 /// - 非同期I/O処理のためawait必須（tokio::io::AsyncWriteExt使用）
 /// - ペイロード長不足時はエラーログ出力のみで処理継続
-pub async fn decode_optneg(stream: &mut TcpStream, payload: &[u8]) {
+pub async fn decode_optneg(stream: &mut TcpStream, payload: &[u8]) -> u32 {
     // Step 1: ペイロード長の検証（プロトコルバージョン+アクション+フラグで最低12バイト必要）
     if payload.len() >= 12 {
         // Step 2: プロトコルバージョン・アクション・フラグの抽出と詳細ログ出力
@@ -68,13 +74,13 @@ pub async fn decode_optneg(stream: &mut TcpStream, payload: &[u8]) {
 
         // Step 3: アクションフラグの分解・個別機能の確認と出力
         let action_flags = [
-            (0x00000001, "ADD_HEADERS"),       // ヘッダ追加
-            (0x00000002, "CHANGE_BODY"),       // 本文変更
-            (0x00000004, "ADD_RECIPIENTS"),    // 宛先追加
-            (0x00000008, "DELETE_RECIPIENTS"), // 宛先削除
-            (0x00000010, "QUARANTINE"),        // 隔離
-            (0x00000020, "REPLACE_HEADERS"),   // ヘッダ置換
-            (0x00000040, "CHANGE_REPLY"),      // 応答変更
+            (MILTER_ACTION_ADD_HEADERS, "ADD_HEADERS"), // ヘッダ追加
+            (0x00000002, "CHANGE_BODY"),                // 本文変更
+            (0x00000004, "ADD_RECIPIENTS"),             // 宛先追加
+            (0x00000008, "DELETE_RECIPIENTS"),          // 宛先削除
+            (0x00000010, "QUARANTINE"),                 // 隔離
+            (MILTER_ACTION_REPLACE_HEADERS, "REPLACE_HEADERS"), // ヘッダ置換
+            (0x00000040, "CHANGE_REPLY"),               // 応答変更
         ];
 
         // 各アクションフラグが立っていれば出力
@@ -128,12 +134,14 @@ pub async fn decode_optneg(stream: &mut TcpStream, payload: &[u8]) {
                 crate::printdaytimeln!(LOG_DEBUG, "[parser] SMFIR_OPTNEG応答送信エラー: {}", e)
             } // 送信失敗時
         }
+        actions
     } else {
         // ペイロード長不足時のエラー出力
         println!(
             "[parser] SMFIC_OPTNEGペイロード長不足: {} bytes",
             payload.len()
         );
+        0
     }
 }
 
@@ -466,44 +474,42 @@ pub fn decode_body(payload: &[u8], body_field: &mut String) {
 pub async fn send_milter_response(
     stream: &mut TcpStream,
     peer_addr: &str,
+    config: &Config,
+    subject: Option<&str>,
+    negotiated_actions: u32,
     filter_result: Option<(String, String)>,
 ) {
+    let can_add_header = negotiated_actions & MILTER_ACTION_ADD_HEADERS != 0;
+    let can_replace_header = negotiated_actions & MILTER_ACTION_REPLACE_HEADERS != 0;
+
     // actionに応じてレスポンスコマンドを決定
     let (resp_cmd, resp_size) = match &filter_result {
         Some((action, _)) if action == "NONE" => (0x61u8, 1u32), // NONE応答（0x61）
         Some((action, _)) if action == "ACCEPT" => (0x61u8, 1u32), // ACCEPT応答（0x61）
         Some((action, logname)) if action == "WARN" => {
-            // WARN応答（0x61）
-            // WARN応答の場合はADDHEADERコマンド(0x68)を送信
-            let reply_packet = build_response_packet(
-                0x68u8, // ADDHEADERコマンド メッセージ部分の先頭には半角スペースをつけないと、つながってしまう
-                &format!("X-MilterAgent\0 Warning: '{logname}' by MilterAgent"),
-            );
-            if let Err(e) = stream.write_all(&reply_packet).await {
-                crate::printdaytimeln!(
-                    LOG_DEBUG,
-                    "[response] ADDHEADER送信エラー: {}: {}",
-                    peer_addr,
-                    e
-                );
-            }
+            send_subject_prefix_if_needed(
+                stream,
+                peer_addr,
+                config,
+                action,
+                subject,
+                can_replace_header,
+            )
+            .await;
+            send_warn_header_if_supported(stream, peer_addr, logname, can_add_header).await;
             (0x61u8, 1u32) // ACCEPT応答 (0x61)
         }
         Some((action, logname)) if action == "REJECT" => {
-            // REJECT応答（0x72）
-            // REJECT応答の場合はREPLYCODEコマンド(0x79)を送信
-            let reply_packet = build_response_packet(
-                0x79u8, // REPLYCODEコマンド
-                &format!("550 5.7.1 Rejected: '{logname}' by MilterAgent"),
-            );
-            if let Err(e) = stream.write_all(&reply_packet).await {
-                crate::printdaytimeln!(
-                    LOG_DEBUG,
-                    "[response] REPLYCODE送信エラー: {}: {}",
-                    peer_addr,
-                    e
-                );
-            }
+            send_subject_prefix_if_needed(
+                stream,
+                peer_addr,
+                config,
+                action,
+                subject,
+                can_replace_header,
+            )
+            .await;
+            send_reject_reply(stream, peer_addr, logname).await;
             (0x72u8, 1u32) // REJECT応答 (0x72)
         }
         Some((action, _)) if action == "DROP" => {
@@ -530,8 +536,7 @@ pub async fn send_milter_response(
     if let Err(e) = stream.write_all(&resp).await {
         crate::printdaytimeln!(LOG_DEBUG, "[response] 応答送信エラー: {}: {}", peer_addr, e);
     // 送信失敗時はエラーログ
-    } else {
-        let (action, logname) = filter_result.as_ref().unwrap();
+    } else if let Some((action, logname)) = filter_result.as_ref() {
         crate::printdaytimeln!(
             LOG_DEBUG,
             "[response] 応答送信: (0x{:02X}) to {} | action={} logname={}",
@@ -539,6 +544,139 @@ pub async fn send_milter_response(
             peer_addr,
             action,
             logname
+        );
+    } else {
+        crate::printdaytimeln!(
+            LOG_DEBUG,
+            "[response] 応答送信: (0x{:02X}) to {} | action=none",
+            resp_cmd,
+            peer_addr
+        );
+    }
+}
+
+// WARN/REJECTごとの設定と実際の判定結果を付き合わせ、今回使うべきプレフィックスだけを返す。
+// 対象外の判定結果や無効モードではNoneを返し、上位は既存レスポンスだけを継続する。
+fn select_subject_prefix<'a>(config: &'a Config, action: &str) -> Option<&'a str> {
+    match (config.add_subject_prefix, action) {
+        (1 | 3, "WARN") if !config.warn_subject_prefix.is_empty() => {
+            Some(config.warn_subject_prefix.as_str())
+        }
+        (2 | 3, "REJECT") if !config.reject_subject_prefix.is_empty() => {
+            Some(config.reject_subject_prefix.as_str())
+        }
+        _ => None,
+    }
+}
+
+// Subject変更は運用上の補助機能なので、交渉未対応・Subject欠落・二重付与のいずれでも安全側に倒して送信しない。
+// 送信しなかった理由をログに残し、WARN/REJECTの元の応答動作はそのまま継続させる。
+async fn send_subject_prefix_if_needed(
+    stream: &mut TcpStream,
+    peer_addr: &str,
+    config: &Config,
+    action: &str,
+    subject: Option<&str>,
+    can_replace_header: bool,
+) {
+    let Some(prefix) = select_subject_prefix(config, action) else {
+        crate::printdaytimeln!(
+            LOG_DEBUG,
+            "[response] CHGHEADER送信なし: action={} はAdd_Subject_Prefix対象外",
+            action
+        );
+        return;
+    };
+
+    if !can_replace_header {
+        crate::printdaytimeln!(
+            LOG_DEBUG,
+            "[response] CHGHEADER送信なし: REPLACE_HEADERS未交渉のため action={} を既存動作で継続",
+            action
+        );
+        return;
+    }
+
+    let Some(subject) = subject.map(str::trim).filter(|value| !value.is_empty()) else {
+        crate::printdaytimeln!(
+            LOG_DEBUG,
+            "[response] CHGHEADER送信なし: Subject未取得のため action={} を既存動作で継続",
+            action
+        );
+        return;
+    };
+
+    if subject.starts_with(prefix) {
+        crate::printdaytimeln!(
+            LOG_DEBUG,
+            "[response] CHGHEADER送信なし: action={} Subjectに同一プレフィックスが既に付与済み",
+            action
+        );
+        return;
+    }
+
+    let rewritten_subject = format!("{prefix}{subject}");
+    let reply_packet = build_change_header_packet("Subject", 1, &rewritten_subject);
+    if let Err(e) = stream.write_all(&reply_packet).await {
+        crate::printdaytimeln!(
+            LOG_DEBUG,
+            "[response] CHGHEADER送信エラー: {}: {}",
+            peer_addr,
+            e
+        );
+    } else {
+        crate::printdaytimeln!(
+            LOG_DEBUG,
+            "[response] CHGHEADER送信: Subject先頭へプレフィックス付与 action={} subject='{}'",
+            action,
+            rewritten_subject
+        );
+    }
+}
+
+// WARN時のX-MilterAgentヘッダーは既存運用の可視性に関わるため維持する。
+// ADD_HEADERS未交渉時だけはMTAに従って送信を諦め、理由をログに残す。
+async fn send_warn_header_if_supported(
+    stream: &mut TcpStream,
+    peer_addr: &str,
+    logname: &str,
+    can_add_header: bool,
+) {
+    if !can_add_header {
+        crate::printdaytimeln!(
+            LOG_DEBUG,
+            "[response] ADDHEADER送信なし: ADD_HEADERS未交渉のためWARNヘッダー追加をスキップ"
+        );
+        return;
+    }
+
+    let reply_packet = build_response_packet(
+        SMFIR_ADDHEADER,
+        &format!("X-MilterAgent\0 Warning: '{logname}' by MilterAgent"),
+    );
+    if let Err(e) = stream.write_all(&reply_packet).await {
+        crate::printdaytimeln!(
+            LOG_DEBUG,
+            "[response] ADDHEADER送信エラー: {}: {}",
+            peer_addr,
+            e
+        );
+    }
+}
+
+// REJECT時の応答コード変更は既存動作を維持する。
+// Subject変更の成否にかかわらず最後に拒否理由を返すため、ここは独立したヘルパーに切り出す。
+async fn send_reject_reply(stream: &mut TcpStream, peer_addr: &str, logname: &str) {
+    let reply_packet = build_response_packet(
+        SMFIR_REPLYCODE,
+        &format!("550 5.7.1 Rejected: '{logname}' by MilterAgent"),
+    );
+    if let Err(e) = stream.write_all(&reply_packet).await {
+        crate::printdaytimeln!(
+            LOG_DEBUG,
+            "[response] REPLYCODE送信エラー: {}: {}",
+            peer_addr,
+            e
         );
     }
 }
@@ -552,5 +690,23 @@ fn build_response_packet(response_code: u8, response_message: &str) -> Vec<u8> {
     packet.extend(&(bytes.len() as u32 + 1).to_be_bytes()); // サイズ
     packet.push(response_code); // コマンド（1バイト）
     packet.extend(bytes); // メッセージ内容
+    packet
+}
+
+fn build_change_header_packet(header_name: &str, header_index: u32, header_value: &str) -> Vec<u8> {
+    // CHGHEADERは index(4バイト) + header_name + NUL + header_value + NUL の並びで送る。
+    // Subjectは通常1件だけを想定し、複数存在しても安全側で先頭要素(index=1)だけを置き換える。
+    let header_name_bytes = header_name.as_bytes();
+    let header_value_bytes = header_value.as_bytes();
+    let payload_len = 4 + header_name_bytes.len() + 1 + header_value_bytes.len() + 1;
+
+    let mut packet = Vec::with_capacity(4 + 1 + payload_len);
+    packet.extend(&((payload_len as u32) + 1).to_be_bytes()); // サイズ
+    packet.push(SMFIR_CHGHEADER); // コマンド（1バイト）
+    packet.extend(&header_index.to_be_bytes()); // 1始まりのヘッダインデックス
+    packet.extend(header_name_bytes);
+    packet.push(0);
+    packet.extend(header_value_bytes);
+    packet.push(0);
     packet
 }

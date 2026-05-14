@@ -68,6 +68,8 @@ pub async fn handle_client(
         std::collections::HashMap::new(); // ヘッダ格納用
     // ボディ情報
     let mut body_field = String::new(); // ボディ格納用
+    // OPTNEGで交渉したアクションフラグ
+    let mut negotiated_actions = 0u32; // CHGHEADER/ADDHEADER可否の判定に使う
     // メインループ: 切断・エラー・タイムアウト・シャットダウン通知以外は繰り返しコマンド受信・応答
     loop {
         // メインループ: 切断・エラー・タイムアウト・シャットダウン通知以外は繰り返しコマンド受信・応答
@@ -225,7 +227,7 @@ pub async fn handle_client(
             // 主要なMilterコマンドごとに分岐し、各処理を実行
             if let MilterCommand::OptNeg = cmd {
                 // OPTNEGコマンド解析処理（ネゴシエーション情報の分解・応答）
-                decode_optneg(&mut stream, &payload).await; // ネゴシエーション応答
+                negotiated_actions = decode_optneg(&mut stream, &payload).await; // ネゴシエーション応答
             } else if let MilterCommand::Connect = cmd {
                 // CONNECTコマンド時は接続情報の分解＆応答（milter.rsに分離）
                 decode_connect(&mut stream, &payload, &peer_addr).await; // 接続情報応答
@@ -271,8 +273,25 @@ pub async fn handle_client(
                             action,
                             logname
                         );
+                        let subject = mail_values
+                            .get("header_subject")
+                            .filter(|value| !value.trim().is_empty())
+                            .or_else(|| {
+                                mail_values
+                                    .get("decode_subject")
+                                    .filter(|value| !value.trim().is_empty())
+                            })
+                            .map(String::as_str);
                         // クライアント(Sendmail/Postfix)への応答処理
-                        send_milter_response(&mut stream, &peer_addr, filter_result).await;
+                        send_milter_response(
+                            &mut stream,
+                            &peer_addr,
+                            &config_val,
+                            subject,
+                            negotiated_actions,
+                            filter_result,
+                        )
+                        .await;
                         // スパム判定され、かつSpamhaus_reportがyesの場合のみ報告
                         if (action == "WARN" || action == "REJECT")
                             && config_val.spamhaus_report
@@ -296,7 +315,15 @@ pub async fn handle_client(
                     );
                     let filter_result = Some(("CONTINUE".to_string(), "continue".to_string()));
                     // クライアント(Sendmail/Postfix)への応答処理
-                    send_milter_response(&mut stream, &peer_addr, filter_result).await;
+                    send_milter_response(
+                        &mut stream,
+                        &peer_addr,
+                        &config_val,
+                        None,
+                        negotiated_actions,
+                        filter_result,
+                    )
+                    .await;
                 }
                 // BODYEOB(=is_body_eob==true)のときのみ、直前のヘッダ情報とボディ情報を出力
                 if is_body_eob {

@@ -78,6 +78,9 @@ Listen 127.0.0.1:8898
 Client_timeout 30
 Log_file /var/log/milteragent.log
 Log_level info
+Add_Subject_Prefix 0
+WARN_Subject_Prefix [WARN]
+REJECT_Subject_Prefix [REJECT]
 
 include MilterAgent.d
 ```
@@ -114,11 +117,16 @@ filter[filter_name] =
 - `Client_timeout`: Client inactivity timeout in seconds
 - `Log_file`: Path to log file (optional, defaults to stdout)
 - `Log_level`: Logging verbosity (`info`, `trace`, `debug`)
+- `Add_Subject_Prefix`: Future Subject-prefix mode switch (`0`: disabled, `1`: WARN only, `2`: REJECT only, `3`: WARN and REJECT)
+- `WARN_Subject_Prefix`: Future Subject prefix text for WARN results (defaults to `"[WARN] "`; one trailing space is automatically appended when values such as `[WARN]` are configured)
+- `REJECT_Subject_Prefix`: Future Subject prefix text for REJECT results (defaults to `"[REJECT] "`; one trailing space is automatically appended when values such as `[REJECT]` are configured)
 - `Spamhaus_report`: Enable Spamhaus API reporting (`yes`/`no`, default: `no`)
 - `Spamhaus_api_token`: Spamhaus API authentication token (optional)
 - `Spamhaus_api_url`: Spamhaus API endpoint URL (optional)
 - `Spamhaus_safe_address`: IP addresses or CIDR networks to exclude from Spamhaus reporting (optional, can be specified multiple times)
 - `include`: Include additional configuration directories
+
+These Subject-prefix settings are preparation for a later header-rewrite step. This change only adds configuration parsing and documentation; it does not modify Subject headers yet.
 
 ## Usage
 

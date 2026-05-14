@@ -39,7 +39,10 @@ pub struct Config {
     pub log_level: u8,            // ログ詳細度（0=info, 2=trace, 8=debug）
     pub filters: Vec<(String, Vec<FilterRule>)>, // フィルター定義リスト（名前とルールセット）
     pub remote_ip_target: u8,     // RemoteIP_Target: 0=外部のみ,1=内部のみ,2=全て
-    pub spamhaus_report: bool,    // Spamhaus情報をログ出力するかのフラグ
+    pub add_subject_prefix: u8, // Subjectプレフィックス制御: 0=無効,1=WARNのみ,2=REJECTのみ,3=両方
+    pub warn_subject_prefix: String, // WARN判定時に付与予定のSubjectプレフィックス（将来機能用）
+    pub reject_subject_prefix: String, // REJECT判定時に付与予定のSubjectプレフィックス（将来機能用）
+    pub spamhaus_report: bool,         // Spamhaus情報をログ出力するかのフラグ
     pub spamhaus_api_token: Option<String>, // Spamhaus API認証用トークン
     pub spamhaus_api_url: Option<String>, // Spamhaus API接続先エンドポイント
     pub spamhaus_safe_addresses: Vec<String>, // Spamhaus通知除外IPアドレス/ネットワーク
@@ -80,6 +83,9 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
         log_level: u8,                           // ログ詳細度設定
         filters: Vec<(String, Vec<FilterRule>)>, // フィルタールール群
         remote_ip_target: u8,                    // RemoteIP_Target: 0=外部のみ,1=内部のみ,2=全て
+        add_subject_prefix: u8,                  // Subjectプレフィックス制御モード
+        warn_subject_prefix: String,             // WARN判定時に使うプレフィックス文字列
+        reject_subject_prefix: String,           // REJECT判定時に使うプレフィックス文字列
         spamhaus_report: bool,                   // Spamhaus連携フラグ
         spamhaus_api_token: Option<String>,      // API認証トークン
         spamhaus_api_url: Option<String>,        // API接続先URL
@@ -118,6 +124,9 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                 || line.starts_with("Log_file")
                 || line.starts_with("Log_level")
                 || line.starts_with("RemoteIP_Target")
+                || line.starts_with("Add_Subject_Prefix")
+                || line.starts_with("WARN_Subject_Prefix")
+                || line.starts_with("REJECT_Subject_Prefix")
                 || line.starts_with("Spamhaus_report")
                 || line.starts_with("Spamhaus_api_token")
                 || line.starts_with("Spamhaus_api_url")
@@ -256,6 +265,39 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                             v as u8
                         };
                         values.remote_ip_target = v;
+                    }
+                }
+            }
+            // Add_Subject_Prefix設定 - 将来のSubject書き換え対象を判定結果ごとに切り替える
+            else if line.starts_with("Add_Subject_Prefix") {
+                if let Some((_, val_str)) = split_key_value(line) {
+                    let full_value = collect_multiline_value(&mut lines, val_str, false);
+                    // 将来のヘッダー変更機能で安全に使えるよう、許可モード以外は無効値0に丸める
+                    values.add_subject_prefix = match full_value.trim().parse::<i64>() {
+                        Ok(v @ 0..=3) => v as u8,
+                        _ => 0,
+                    };
+                }
+            }
+            // WARN_Subject_Prefix設定 - WARN判定時に付与する予定の文字列を保持する
+            else if line.starts_with("WARN_Subject_Prefix") {
+                if let Some((_, value)) = split_key_value(line) {
+                    let full_value = collect_multiline_value(&mut lines, value, false);
+                    let prefix = full_value.trim();
+                    // 空文字は設定ミスとみなし、将来の実装が安定して動くよう既定値を維持する
+                    if !prefix.is_empty() {
+                        values.warn_subject_prefix = normalize_subject_prefix(prefix);
+                    }
+                }
+            }
+            // REJECT_Subject_Prefix設定 - REJECT判定時に付与する予定の文字列を保持する
+            else if line.starts_with("REJECT_Subject_Prefix") {
+                if let Some((_, value)) = split_key_value(line) {
+                    let full_value = collect_multiline_value(&mut lines, value, false);
+                    let prefix = full_value.trim();
+                    // 空文字は設定ミスとみなし、将来の実装が安定して動くよう既定値を維持する
+                    if !prefix.is_empty() {
+                        values.reject_subject_prefix = normalize_subject_prefix(prefix);
                     }
                 }
             }
@@ -470,6 +512,19 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
         }
     }
 
+    // Subjectプレフィックス正規化関数
+    // 設定例では見やすさのため末尾スペースを省略できるが、実際の件名付与では単語が連結しない形に揃える
+    fn normalize_subject_prefix(prefix: &str) -> String {
+        let trimmed = prefix.trim();
+        if trimmed.is_empty() {
+            String::new()
+        } else if trimmed.ends_with(' ') {
+            trimmed.to_string()
+        } else {
+            format!("{trimmed} ")
+        }
+    }
+
     // 設定ファイル本体の読み込み実行
     let text = std::fs::read_to_string(path).expect("設定ファイル読み込み失敗");
 
@@ -480,8 +535,11 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
         log_file: None,        // デフォルトは標準出力
         log_level: 0,          // デフォルトはinfoレベル
         filters: Vec::new(),
-        remote_ip_target: 0,    // デフォルトは0（外部のみ）
-        spamhaus_report: false, // デフォルトはSpamhaus情報非出力
+        remote_ip_target: 0,                        // デフォルトは0（外部のみ）
+        add_subject_prefix: 0,                      // デフォルトはSubject変更なし
+        warn_subject_prefix: "[WARN] ".to_string(), // WARN時の既定プレフィックス
+        reject_subject_prefix: "[REJECT] ".to_string(), // REJECT時の既定プレフィックス
+        spamhaus_report: false,                     // デフォルトはSpamhaus情報非出力
         spamhaus_api_token: None,
         spamhaus_api_url: None,
         spamhaus_safe_addresses: Vec::new(), // デフォルトは空のホワイトリスト
@@ -518,6 +576,9 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
         log_file: values.log_file,
         log_level: values.log_level,
         filters: values.filters,
+        add_subject_prefix: values.add_subject_prefix,
+        warn_subject_prefix: values.warn_subject_prefix,
+        reject_subject_prefix: values.reject_subject_prefix,
         spamhaus_report: values.spamhaus_report,
         spamhaus_api_token: values.spamhaus_api_token,
         spamhaus_api_url: values.spamhaus_api_url,

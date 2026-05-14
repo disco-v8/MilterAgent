@@ -14,3 +14,13 @@ Listen [::]:8898
 # Client inactivity timeout in seconds
 # Clients will be disconnected if no data is received within this time
 Client_timeout 30
+
+# Subject prefix preparation settings
+# Add_Subject_Prefix switches which future actions may prepend Subject text.
+# 0=disabled, 1=WARN only, 2=REJECT only, 3=WARN and REJECT.
+# One trailing space is automatically appended to each prefix value when it is used later.
+# Write [WARN] or [REJECT] here, and MilterAgent will internally normalize them to "[WARN] " and "[REJECT] ".
+# These settings are documented now, but Subject rewriting is not implemented in this step.
+Add_Subject_Prefix 0
+WARN_Subject_Prefix [WARN]
+REJECT_Subject_Prefix [REJECT]
