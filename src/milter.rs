@@ -439,27 +439,24 @@ pub fn decode_header(
 ///
 /// # 引数
 /// - `payload`: BODYコマンドのペイロード（メール本文の一部分のバイト列）
-/// - `body_field`: メール本文を蓄積するためのString（可変参照）
+/// - `body_field`: メール本文を蓄積するためのバイト列（可変参照）
 ///
 /// # 説明
 /// Milterプロトコルで受信したBODYコマンドのペイロード（メール本文の断片）を
-/// UTF-8文字列に変換し、既存のbody_fieldに追記して蓄積する。
+/// 生バイトのまま既存のbody_fieldに追記して蓄積する。
 /// 複数回のBODYコマンドで送信される本文を順次結合し、完全な本文を構築する。
 ///
 /// # 処理フロー
-/// 1. ペイロードをUTF-8文字列に変換（エラー時は置換文字使用）
-/// 2. 変換した文字列を既存のbody_fieldに追記
+/// 1. ペイロードをそのまま保持する
+/// 2. 生バイト列を既存のbody_fieldに追記
 ///
 /// # 注意点
 /// - 文字コード変換やデコード処理は行わない（生データのまま蓄積）
 /// - BODYコマンドは複数回送信される可能性があるため追記処理を採用
 /// - BODYEOB時点で完全なメール本文がbody_fieldに格納される
-pub fn decode_body(payload: &[u8], body_field: &mut String) {
-    // Step 1: ペイロードをUTF-8文字列に変換（無効バイトは置換文字に変換）
-    let s = String::from_utf8_lossy(payload); // ペイロードをUTF-8文字列化
-
-    // Step 2: 変換した文字列を既存body_fieldに追記（複数BODYコマンドの結合）
-    body_field.push_str(&s); // 既存body_fieldに追記
+pub fn decode_body(payload: &[u8], body_field: &mut Vec<u8>) {
+    // 本文は8bitや各種文字コードを含み得るため、ここでUTF-8化せず受信バイト列をそのまま保持する。
+    body_field.extend_from_slice(payload); // 複数BODYコマンドの断片を順番どおりに連結
 }
 
 /// Milter応答送信処理

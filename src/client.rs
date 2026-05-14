@@ -67,7 +67,7 @@ pub async fn handle_client(
     let mut header_fields: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new(); // ヘッダ格納用
     // ボディ情報
-    let mut body_field = String::new(); // ボディ格納用
+    let mut body_field = Vec::new(); // ボディ格納用（8bit本文を壊さないよう生バイトで保持）
     // OPTNEGで交渉したアクションフラグ
     let mut negotiated_actions = 0u32; // CHGHEADER/ADDHEADER可否の判定に使う
     // メインループ: 切断・エラー・タイムアウト・シャットダウン通知以外は繰り返しコマンド受信・応答

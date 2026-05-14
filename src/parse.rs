@@ -140,29 +140,26 @@ impl ParsedMail {
 /// 7. 構造化されたパース結果を返却
 pub fn parse_mail(
     header_fields: &HashMap<String, Vec<String>>,
-    body_field: &str,
+    body_field: &[u8],
     macro_fields: &HashMap<String, String>,
     remote_ip_target: u8, // 0=外部のみ(ループバック拒否), 1=内部のみ(ループバックのみ許可), 2=全て許可
 ) -> Option<ParsedMail> {
-    // ヘッダ情報とボディ情報を合体し、RFC準拠のメール全体文字列を作成
-    let mut mail_string = String::new(); // メール全体の文字列構築用バッファ
+    // ヘッダはASCII主体だが本文は8bitのまま来るため、メール全体は最後まで生バイトで組み立てる。
+    let mut mail_bytes = Vec::new(); // メール全体のバイト列構築用バッファ
 
     // Milterで受信した各ヘッダを「ヘッダ名: 値」形式でメール文字列に追加
     for (k, vlist) in header_fields {
         // 同一ヘッダ名で複数値がある場合（Received等）も全て処理
         for v in vlist {
-            mail_string.push_str(&format!("{k}: {v}\r\n")); // RFC準拠のCRLF改行
+            mail_bytes.extend_from_slice(format!("{k}: {v}\r\n").as_bytes()); // RFC準拠のCRLF改行
         }
     }
 
-    mail_string.push_str("\r\n"); // ヘッダ部とボディ部の区切り空行（RFC必須）
-
-    // ボディ部の改行コードをCRLFに統一（OS依存の改行コード差異を吸収）
-    let body_crlf = body_field.replace("\r\n", "\n").replace('\n', "\r\n");
-    mail_string.push_str(&body_crlf); // 正規化されたボディを追加
+    mail_bytes.extend_from_slice(b"\r\n"); // ヘッダ部とボディ部の区切り空行（RFC必須）
+    mail_bytes.extend_from_slice(body_field); // 本文は受信したバイト列をそのまま追加
 
     // NULバイト（\0）を可視化文字に置換してデバッグ出力用に整形
-    let mail_string_visible = mail_string.replace("\0", "<NUL>");
+    let mail_string_visible = String::from_utf8_lossy(&mail_bytes).replace('\0', "<NUL>");
     crate::printdaytimeln!(LOG_DEBUG, "[parser] --- BODYEOB時のメール全体 ---");
     crate::printdaytimeln!(LOG_DEBUG, "{}", mail_string_visible); // 生メールデータの可視化出力
     crate::printdaytimeln!(
@@ -172,7 +169,7 @@ pub fn parse_mail(
 
     // mail-parserでメール全体をパース（バイト配列として処理）
     let parser = MessageParser::default(); // パーサーインスタンス生成（デフォルト設定）
-    if let Some(msg) = parser.parse(mail_string.as_bytes()) {
+    if let Some(msg) = parser.parse(&mail_bytes) {
         // === パース成功時の処理開始 ===
 
         // === マクロ情報から接続情報を抽出 ===
