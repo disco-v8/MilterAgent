@@ -75,12 +75,12 @@ pub async fn decode_optneg(stream: &mut TcpStream, payload: &[u8]) -> u32 {
         // Step 3: アクションフラグの分解・個別機能の確認と出力
         let action_flags = [
             (MILTER_ACTION_ADD_HEADERS, "ADD_HEADERS"), // ヘッダ追加
-            (0x00000002, "CHANGE_BODY"),       // 本文変更
-            (0x00000004, "ADD_RECIPIENTS"),    // 宛先追加
-            (0x00000008, "DELETE_RECIPIENTS"), // 宛先削除
-            (0x00000010, "QUARANTINE"),        // 隔離
+            (0x00000002, "CHANGE_BODY"),                // 本文変更
+            (0x00000004, "ADD_RECIPIENTS"),             // 宛先追加
+            (0x00000008, "DELETE_RECIPIENTS"),          // 宛先削除
+            (0x00000010, "QUARANTINE"),                 // 隔離
             (MILTER_ACTION_REPLACE_HEADERS, "REPLACE_HEADERS"), // ヘッダ置換
-            (0x00000040, "CHANGE_REPLY"),      // 応答変更
+            (0x00000040, "CHANGE_REPLY"),               // 応答変更
         ];
 
         // 各アクションフラグが立っていれば出力
@@ -597,7 +597,10 @@ async fn send_subject_prefix_if_needed(
         return;
     }
 
-    let Some(subject) = subject.map(str::trim).filter(|value| !value.is_empty()) else {
+    let Some(subject) = subject
+        .and_then(normalize_subject_header_value)
+        .filter(|value| !value.is_empty())
+    else {
         crate::printdaytimeln!(
             LOG_DEBUG,
             "[response] CHGHEADER送信なし: Subject未取得のため action={} を既存動作で継続",
@@ -633,6 +636,45 @@ async fn send_subject_prefix_if_needed(
             action,
             rewritten_subject
         );
+    }
+}
+
+// CHGHEADERへ渡す値は1行ヘッダー前提なので、折り返し改行や制御文字を残すと後続ヘッダー境界を壊し得る。
+// ここでは生Subjectの見た目を大きく変えない範囲で、改行系を空白へ畳み込み、NULを含む非表示制御文字を除去する。
+fn normalize_subject_header_value(subject: &str) -> Option<String> {
+    let mut normalized = String::with_capacity(subject.len());
+    let mut previous_was_space = false;
+
+    for ch in subject.chars() {
+        let mapped = match ch {
+            '\r' | '\n' | '\t' => Some(' '),
+            '\0' => None,
+            _ if ch.is_control() => None,
+            _ => Some(ch),
+        };
+
+        let Some(ch) = mapped else {
+            continue;
+        };
+
+        if ch == ' ' {
+            if previous_was_space {
+                continue;
+            }
+            previous_was_space = true;
+            normalized.push(ch);
+            continue;
+        }
+
+        previous_was_space = false;
+        normalized.push(ch);
+    }
+
+    let trimmed = normalized.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
     }
 }
 
