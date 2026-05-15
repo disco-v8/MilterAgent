@@ -15,6 +15,8 @@
 // - ヘッダ・ボディ情報の格納・加工
 // =========================
 
+use std::sync::OnceLock;
+
 use tokio::{
     io::AsyncWriteExt, // 非同期I/Oトレイト（write_all等）
     net::TcpStream,    // 非同期TCPストリーム
@@ -27,6 +29,20 @@ const MILTER_ACTION_REPLACE_HEADERS: u32 = 0x0000_0020;
 const SMFIR_ADDHEADER: u8 = 0x68;
 const SMFIR_CHGHEADER: u8 = 0x6d;
 const SMFIR_REPLYCODE: u8 = 0x79;
+
+static LOCAL_HOSTNAME: OnceLock<String> = OnceLock::new();
+
+// X-MilterAgentヘッダーへ載せるホスト名は接続ごとに変わらないため、最初の取得結果をプロセス内で再利用する。
+// 取得に失敗した場合でもヘッダー生成を止めないよう、安全側で unknown-host を返す。
+fn get_local_hostname() -> &'static str {
+    LOCAL_HOSTNAME.get_or_init(|| {
+        hostname::get()
+            .ok()
+            .and_then(|value| value.into_string().ok())
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "unknown-host".to_string())
+    })
+}
 
 /// OPTNEGコマンドのデコード・応答送信処理
 ///
@@ -691,9 +707,10 @@ async fn send_warn_header_if_supported(
         return;
     }
 
+    let local_hostname = get_local_hostname();
     let reply_packet = build_response_packet(
         SMFIR_ADDHEADER,
-        &format!("X-MilterAgent\0 Warning: '{logname}' by MilterAgent"),
+        &format!("X-MilterAgent\0 Warning: '{logname}' by MilterAgent on {local_hostname}"),
     );
     if let Err(e) = stream.write_all(&reply_packet).await {
         crate::printdaytimeln!(
