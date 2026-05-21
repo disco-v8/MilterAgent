@@ -42,7 +42,7 @@ pub struct Config {
     pub add_subject_prefix: u8, // Subjectプレフィックス制御: 0=無効,1=WARNのみ,2=REJECTのみ,3=両方
     pub warn_subject_prefix: String, // WARN判定時に付与するSubjectプレフィックス
     pub reject_subject_prefix: String, // REJECT判定時に付与するSubjectプレフィックス
-    pub spamhaus_report: bool,         // Spamhaus情報をログ出力するかのフラグ
+    pub spamhaus_report: bool,  // Spamhaus情報をログ出力するかのフラグ
     pub spamhaus_api_token: Option<String>, // Spamhaus API認証用トークン
     pub spamhaus_api_url: Option<String>, // Spamhaus API接続先エンドポイント
     pub spamhaus_safe_addresses: Vec<String>, // Spamhaus通知除外IPアドレス/ネットワーク
