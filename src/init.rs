@@ -40,8 +40,8 @@ pub struct Config {
     pub filters: Vec<(String, Vec<FilterRule>)>, // フィルター定義リスト（名前とルールセット）
     pub remote_ip_target: u8,     // RemoteIP_Target: 0=外部のみ,1=内部のみ,2=全て
     pub add_subject_prefix: u8, // Subjectプレフィックス制御: 0=無効,1=WARNのみ,2=REJECTのみ,3=両方
-    pub warn_subject_prefix: String, // WARN判定時に付与予定のSubjectプレフィックス（将来機能用）
-    pub reject_subject_prefix: String, // REJECT判定時に付与予定のSubjectプレフィックス（将来機能用）
+    pub warn_subject_prefix: String, // WARN判定時に付与するSubjectプレフィックス
+    pub reject_subject_prefix: String, // REJECT判定時に付与するSubjectプレフィックス
     pub spamhaus_report: bool,         // Spamhaus情報をログ出力するかのフラグ
     pub spamhaus_api_token: Option<String>, // Spamhaus API認証用トークン
     pub spamhaus_api_url: Option<String>, // Spamhaus API接続先エンドポイント
@@ -268,34 +268,34 @@ pub fn load_config<P: AsRef<std::path::Path>>(path: P) -> Config {
                     }
                 }
             }
-            // Add_Subject_Prefix設定 - 将来のSubject書き換え対象を判定結果ごとに切り替える
+            // Add_Subject_Prefix設定 - Subject書き換え対象を判定結果ごとに切り替える
             else if line.starts_with("Add_Subject_Prefix") {
                 if let Some((_, val_str)) = split_key_value(line) {
                     let full_value = collect_multiline_value(&mut lines, val_str, false);
-                    // 将来のヘッダー変更機能で安全に使えるよう、許可モード以外は無効値0に丸める
+                    // Subject書き換え処理で安全に使えるよう、許可モード以外は無効値0に丸める
                     values.add_subject_prefix = match full_value.trim().parse::<i64>() {
                         Ok(v @ 0..=3) => v as u8,
                         _ => 0,
                     };
                 }
             }
-            // WARN_Subject_Prefix設定 - WARN判定時に付与する予定の文字列を保持する
+            // WARN_Subject_Prefix設定 - WARN判定時に付与する文字列を保持する
             else if line.starts_with("WARN_Subject_Prefix") {
                 if let Some((_, value)) = split_key_value(line) {
                     let full_value = collect_multiline_value(&mut lines, value, false);
                     let prefix = full_value.trim();
-                    // 空文字は設定ミスとみなし、将来の実装が安定して動くよう既定値を維持する
+                    // 空文字は設定ミスとみなし、Subject書き換えが安定して動くよう既定値を維持する
                     if !prefix.is_empty() {
                         values.warn_subject_prefix = normalize_subject_prefix(prefix);
                     }
                 }
             }
-            // REJECT_Subject_Prefix設定 - REJECT判定時に付与する予定の文字列を保持する
+            // REJECT_Subject_Prefix設定 - REJECT判定時に付与する文字列を保持する
             else if line.starts_with("REJECT_Subject_Prefix") {
                 if let Some((_, value)) = split_key_value(line) {
                     let full_value = collect_multiline_value(&mut lines, value, false);
                     let prefix = full_value.trim();
-                    // 空文字は設定ミスとみなし、将来の実装が安定して動くよう既定値を維持する
+                    // 空文字は設定ミスとみなし、Subject書き換えが安定して動くよう既定値を維持する
                     if !prefix.is_empty() {
                         values.reject_subject_prefix = normalize_subject_prefix(prefix);
                     }

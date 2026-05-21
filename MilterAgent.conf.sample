@@ -16,11 +16,11 @@ Listen [::]:8898
 Client_timeout 30
 
 # Subject prefix preparation settings
-# Add_Subject_Prefix switches which future actions may prepend Subject text.
+# Add_Subject_Prefix switches which actions may prepend Subject text.
 # 0=disabled, 1=WARN only, 2=REJECT only, 3=WARN and REJECT.
-# One trailing space is automatically appended to each prefix value when it is used later.
+# One trailing space is automatically appended to each prefix value when it is used.
 # Write [WARN] or [REJECT] here, and MilterAgent will internally normalize them to "[WARN] " and "[REJECT] ".
-# These settings are documented now, but Subject rewriting is not implemented in this step.
+# These settings control Subject rewriting when WARN or REJECT is returned.
 Add_Subject_Prefix 0
 WARN_Subject_Prefix [WARN]
 REJECT_Subject_Prefix [REJECT]
