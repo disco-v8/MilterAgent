@@ -28,6 +28,13 @@ Thumbs.db
 *.pdb
 *.d
 
+# Keep checked-in configuration fragments under etc/MilterAgent.d versioned.
+!etc/MilterAgent.d/
+!etc/MilterAgent.d/**
+
 # Temporary files
 *.tmp
 *.temp
+
+# Shared exclusion for the local-only filter definition.
+etc/MilterAgent.d/filter_other.conf
