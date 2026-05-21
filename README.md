@@ -117,7 +117,7 @@ filter[filter_name] =
 - `Client_timeout`: Client inactivity timeout in seconds
 - `Log_file`: Path to log file (optional, defaults to stdout)
 - `Log_level`: Logging verbosity (`info`, `trace`, `debug`)
-- `Add_Subject_Prefix`: Subject-prefix mode switch (`0`: disabled, `1`: WARN only, `2`: REJECT only, `3`: WARN and REJECT)
+- `Add_Subject_Prefix`: Subject-prefix mode switch (`0`: disabled, `1`: WARN only, `2`: REJECT only, `3`: WARN and REJECT). Subject rewriting for WARN/REJECT is applied only when header replacement has been negotiated with the MTA.
 - `WARN_Subject_Prefix`: Subject prefix text for WARN results (defaults to `"[WARN] "`; one trailing space is automatically appended when values such as `[WARN]` are configured)
 - `REJECT_Subject_Prefix`: Subject prefix text for REJECT results (defaults to `"[REJECT] "`; one trailing space is automatically appended when values such as `[REJECT]` are configured)
 - `Spamhaus_report`: Enable Spamhaus API reporting (`yes`/`no`, default: `no`)

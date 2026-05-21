@@ -117,7 +117,7 @@ filter[フィルター名] =
 - `Client_timeout`: クライアント非アクティブタイムアウト（秒）
 - `Log_file`: ログファイルパス（オプション、デフォルトは標準出力）
 - `Log_level`: ログ詳細度（`info`、`trace`、`debug`）
-- `Add_Subject_Prefix`: Subjectプレフィックス付与対象を切り替えるモード（`0`: 無効、`1`: WARNのみ、`2`: REJECTのみ、`3`: WARNとREJECTの両方）
+- `Add_Subject_Prefix`: Subjectプレフィックス付与対象を切り替えるモード（`0`: 無効、`1`: WARNのみ、`2`: REJECTのみ、`3`: WARNとREJECTの両方）。MTA側でヘッダー置換が交渉された場合にのみ、WARN/REJECT 判定時の Subject 書き換えに利用されます。
 - `WARN_Subject_Prefix`: WARN判定時に使うSubjectプレフィックス文字列（未指定時は `"[WARN] "`。`[WARN]` のように指定した場合は、末尾スペースを1つ自動追加）
 - `REJECT_Subject_Prefix`: REJECT判定時に使うSubjectプレフィックス文字列（未指定時は `"[REJECT] "`。`[REJECT]` のように指定した場合は、末尾スペースを1つ自動追加）
 - `Spamhaus_report`: Spamhaus APIへの報告を有効にする（`yes`/`no`、デフォルト: `no`）
@@ -125,8 +125,6 @@ filter[フィルター名] =
 - `Spamhaus_api_url`: Spamhaus APIエンドポイントURL（オプション）
 - `Spamhaus_safe_address`: Spamhaus報告から除外するIPアドレスまたはCIDRネットワーク（オプション、複数指定可能）
 - `include`: 追加設定ディレクトリをインクルード
-
-これらのSubjectプレフィックス設定は、MTA側でヘッダー置換が交渉された場合に、WARN/REJECT 判定時の Subject 書き換えに利用されます。
 
 ## 使用方法
 
