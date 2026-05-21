@@ -126,8 +126,6 @@ filter[filter_name] =
 - `Spamhaus_safe_address`: IP addresses or CIDR networks to exclude from Spamhaus reporting (optional, can be specified multiple times)
 - `include`: Include additional configuration directories
 
-These Subject-prefix settings control Subject header rewriting for WARN and REJECT results when the MTA negotiates header replacement support.
-
 ## Usage
 
 ### Starting the Server
