@@ -489,6 +489,13 @@ pub fn parse_mail(
                     header_fields_for_filter.insert(format!("header_{key_lower}"), joined);
                     // header_接頭辞付きで格納
                 }
+                "received" => {
+                    header_fields_for_filter.insert("header_receiveds".to_string(), joined);
+                    // Receivedヘッダは複数あるため、header_receivedsとしてまとめて格納
+                    let last = vlist.last().cloned().unwrap_or_default();
+                    header_fields_for_filter.insert("header_first_received".to_string(), last);
+                    // 追加: 最後のReceived（配列の最後＝最古）を header_first_received として格納
+                }
                 _ => {
                     header_fields_for_filter.insert(key_lower, joined); // その他ヘッダはそのまま格納
                 }
