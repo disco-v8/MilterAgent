@@ -38,3 +38,4 @@ Thumbs.db
 
 # Shared exclusion for the local-only filter definition.
 etc/MilterAgent.d/filter_other.conf
+etc/MilterAgent.d/filter_kkr.conf
