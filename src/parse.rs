@@ -483,9 +483,9 @@ pub fn parse_mail(
             let joined = vlist.join(", "); // ヘッダ値をカンマ区切りで連結
             let key_lower = k.to_ascii_lowercase(); // ヘッダ名を小文字化
 
-            // 主要ヘッダ（from, to, subject）の処理
+            // 主要ヘッダ（from, to, subject, etc...）の処理
             match key_lower.as_str() {
-                "from" | "to" | "subject" => {
+                "from" | "to" | "subject" | "return-path" | "reply-to" | "message-id" => {
                     header_fields_for_filter.insert(format!("header_{key_lower}"), joined);
                     // header_接頭辞付きで格納
                 }
