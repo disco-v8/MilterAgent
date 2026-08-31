@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.4] - 2026-08-19
 
 ### Added
-- Added header-prefixed filter keys for Reply-To, Return-Path, and Message-ID
-- Improved header field coverage so filters can reference header_reply-to, header_return-path, and header_message-id consistently
+- Added header-prefixed filter keys for Reply-To, and Message-ID
+- Improved header field coverage so filters can reference header_reply-to, and header_message-id consistently
 
 ## [0.3.3] - 2025-10-02
 

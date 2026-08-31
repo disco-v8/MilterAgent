@@ -485,7 +485,7 @@ pub fn parse_mail(
 
             // 主要ヘッダ（from, to, subject, etc...）の処理
             match key_lower.as_str() {
-                "from" | "to" | "subject" | "return-path" | "reply-to" | "message-id" => {
+                "from" | "to" | "subject" | "reply-to" | "message-id" => {
                     header_fields_for_filter.insert(format!("header_{key_lower}"), joined);
                     // header_接頭辞付きで格納
                 }
