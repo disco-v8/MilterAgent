@@ -303,6 +303,9 @@ pub fn parse_mail(
         // === 件名（Subject）情報の抽出 ===
         let subject = msg.subject().unwrap_or("(なし)"); // 件名無し時のデフォルト値
 
+        // To文字列から不可視文字とBiDi制御文字を除去して、Fromと同じ正規化規則にそろえる
+        let to = remove_invisible_and_bidi_chars(&to);
+
         // Subject文字列から不可視文字とBiDi制御文字を除去
         let subject = remove_invisible_and_bidi_chars(subject);
 
@@ -393,7 +396,8 @@ pub fn parse_mail(
                             idx + 1,
                             body
                         ); // テキスト本文出力
-                        all_text.push_str(&body); // 連結用バッファに追加
+                        let sanitized_body = remove_invisible_and_bidi_chars(&body); // フィルター用本文から不可視文字とBiDi制御文字を除去
+                        all_text.push_str(&sanitized_body); // 正規化済み本文を連結用バッファに追加
                         all_text.push('\n'); // パート間の区切り改行
                     }
 
@@ -405,7 +409,8 @@ pub fn parse_mail(
                             idx + 1,
                             html_body
                         ); // HTML本文出力
-                        all_html.push_str(&html_body); // 連結用バッファに追加
+                        let sanitized_html_body = remove_invisible_and_bidi_chars(&html_body); // フィルター用HTML本文から不可視文字とBiDi制御文字を除去
+                        all_html.push_str(&sanitized_html_body); // 正規化済みHTML本文を連結用バッファに追加
                         all_html.push('\n'); // パート間の区切り改行
                     }
                 }
@@ -518,4 +523,58 @@ pub fn parse_mail(
 
     // パース失敗時はNoneを返す
     None // パース失敗：Noneを返却
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // 本文種別ごとに、任意位置のBOMを除去したフィルター用値を返す。
+    fn parse_message_body(content_type: &str, body: &str) -> ParsedMail {
+        let mut header_fields = HashMap::new();
+        header_fields.insert("From".to_string(), vec!["sender@example.com".to_string()]);
+        header_fields.insert("To".to_string(), vec!["recipient@example.com".to_string()]);
+        header_fields.insert("Subject".to_string(), vec!["subject".to_string()]);
+        header_fields.insert("Content-Type".to_string(), vec![content_type.to_string()]);
+
+        parse_mail(&header_fields, body.as_bytes(), &HashMap::new(), 2)
+            .expect("the complete RFC 5322 test message must parse")
+    }
+
+    // フィルター本文では、単語の途中に混入した不可視文字も除去する。
+    #[test]
+    fn sanitizes_invisible_characters_in_plain_text_body() {
+        let parsed_mail = parse_message_body("text/plain; charset=utf-8", "Ama\u{FEFF}zon");
+
+        assert_eq!(parsed_mail.decode_text, "Amazon\n");
+    }
+
+    // HTML本文もプレーンテキスト本文と同じ不可視文字除去規則に従う。
+    #[test]
+    fn sanitizes_invisible_characters_in_html_body() {
+        let parsed_mail = parse_message_body("text/html; charset=utf-8", "<p>Ama\u{FEFF}zon</p>");
+
+        assert_eq!(parsed_mail.decode_html, "<p>Amazon</p>\n");
+    }
+
+    // ToもFromとSubjectと同じく、フィルター用のデコード済み値として正規化する。
+    #[test]
+    fn sanitizes_invisible_characters_in_recipient() {
+        let mut header_fields = HashMap::new();
+        header_fields.insert("From".to_string(), vec!["sender@example.com".to_string()]);
+        header_fields.insert(
+            "To".to_string(),
+            vec!["Ama\u{FEFF}zon <recipient@example.com>".to_string()],
+        );
+        header_fields.insert("Subject".to_string(), vec!["subject".to_string()]);
+        header_fields.insert(
+            "Content-Type".to_string(),
+            vec!["text/plain; charset=utf-8".to_string()],
+        );
+
+        let parsed_mail = parse_mail(&header_fields, b"body", &HashMap::new(), 2)
+            .expect("the complete RFC 5322 test message must parse");
+
+        assert_eq!(parsed_mail.decode_to, "Amazon <recipient@example.com>");
+    }
 }
